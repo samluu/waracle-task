@@ -1,7 +1,10 @@
 # waracle-task
 
 ## Use of AI
+
 - generate a skeleton with AI to setup docker-compose, postgres, the default go web framework, CI/CD etc
+- set up the OpenAPI spec, code generation from it, and Swagger UI
+- review the repo and explain trade-offs in the generated code
 
 ## Assumptions
 
