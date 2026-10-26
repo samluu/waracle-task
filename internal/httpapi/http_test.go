@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -72,4 +73,32 @@ func TestHTTP(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Pins the room search's page format: the rooms array, next_cursor only when there's another page, and
+// an empty page as [] rather than null. The cursor itself is opaque, so only its presence is checked.
+func TestHTTPRoomPage(t *testing.T) {
+	const search = "/rooms?check_in=2027-01-11&check_out=2027-01-13&guests=1&limit=1"
+	twoRooms := &mocks.StoreMock{FindRoomsFunc: func(context.Context, store.RoomFilter) ([]store.Room, error) {
+		return []store.Room{testBooking.Room, testBooking.Room}, nil // one more than the page: there's a next page
+	}}
+	var page struct {
+		Rooms      []json.RawMessage `json:"rooms"`
+		NextCursor *string           `json:"next_cursor"`
+	}
+	rec := serve(t, twoRooms, http.MethodGet, search, "")
+	if err := json.Unmarshal(rec.Body.Bytes(), &page); err != nil || rec.Code != http.StatusOK {
+		t.Fatalf("status %d, body %s (%v)", rec.Code, rec.Body, err)
+	}
+	if len(page.Rooms) != 1 || page.NextCursor == nil || *page.NextCursor == "" {
+		t.Fatalf("want 1 room and a next_cursor, got %s", rec.Body)
+	}
+	assertJSON(t, serve(t, &mocks.StoreMock{FindRoomsFunc: func(context.Context, store.RoomFilter) ([]store.Room, error) {
+		return []store.Room{testBooking.Room}, nil
+	}}, http.MethodGet, search, ""),
+		http.StatusOK, `{"rooms":[{"id":2,"number":"102","type":"single","capacity":1,"hotel":{"id":1,"name":"The Grand Hotel"}}]}`)
+	assertJSON(t, serve(t, &mocks.StoreMock{FindRoomsFunc: func(context.Context, store.RoomFilter) ([]store.Room, error) {
+		return nil, nil
+	}}, http.MethodGet, search, ""),
+		http.StatusOK, `{"rooms":[]}`)
 }

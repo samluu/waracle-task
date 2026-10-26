@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 
@@ -40,8 +41,8 @@ func TestFindHotelByName(t *testing.T) {
 func TestFindRooms(t *testing.T) {
 	s := seededTestStore(t)
 	grand, seaside, nope := "The Grand Hotel", "Seaside Inn", "Nope"
-	search := func(hotel *string, checkIn, checkOut string, guests int) RoomFilter {
-		return RoomFilter{HotelName: hotel, CheckIn: date(checkIn), CheckOut: date(checkOut), Guests: guests}
+	search := func(hotel *string, checkIn, checkOut string, guests int) RoomFilter { // one page holds every result
+		return RoomFilter{HotelName: hotel, CheckIn: date(checkIn), CheckOut: date(checkOut), Guests: guests, Limit: 100}
 	}
 	allRooms := func(hotel string) []string {
 		return []string{hotel + "/101", hotel + "/102", hotel + "/201", hotel + "/202", hotel + "/301", hotel + "/302"}
@@ -87,6 +88,54 @@ func TestFindRooms(t *testing.T) {
 				t.Fatalf("got %v\nwant %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// Paging through every free room, 3 at a time, returns each room exactly once, in order.
+func TestFindRoomsPages(t *testing.T) {
+	s := seededTestStore(t)
+	grand := "The Grand Hotel"
+	page := func(hotel *string, after *RoomKey, limit int) []string {
+		t.Helper()
+		rooms, err := s.FindRooms(t.Context(), RoomFilter{
+			HotelName: hotel, CheckIn: date("2027-01-11"), CheckOut: date("2027-01-13"), Guests: 1, After: after, Limit: limit,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, r := range rooms {
+			got = append(got, r.HotelName+"/"+r.Number)
+		}
+		return got
+	}
+
+	// Over 11-13 Jan, 8 rooms are free across both hotels (see TestFindRooms).
+	pages := [][]string{
+		{"Seaside Inn/101", "Seaside Inn/102", "Seaside Inn/201"},
+		{"Seaside Inn/301", "Seaside Inn/302", "The Grand Hotel/102"},
+		{"The Grand Hotel/202", "The Grand Hotel/302"},
+	}
+	var after *RoomKey
+	for i, want := range pages {
+		got := page(nil, after, 3)
+		if !slices.Equal(got, want) {
+			t.Fatalf("page %d: got %v\nwant %v", i+1, got, want)
+		}
+		last := strings.SplitN(got[len(got)-1], "/", 2)
+		after = &RoomKey{HotelName: last[0], Number: last[1]}
+	}
+	if got := page(nil, after, 3); got != nil {
+		t.Fatalf("after the last room: got %v, want nothing", got)
+	}
+
+	// A cursor from one hotel's page carries on within that hotel when the search names it.
+	if got, want := page(&grand, &RoomKey{HotelName: grand, Number: "102"}, 3), []string{"The Grand Hotel/202", "The Grand Hotel/302"}; !slices.Equal(got, want) {
+		t.Fatalf("one hotel after 102: got %v\nwant %v", got, want)
+	}
+	// After a room that's now booked, paging still starts at the next room in order.
+	if got, want := page(nil, &RoomKey{HotelName: grand, Number: "101"}, 3), []string{"The Grand Hotel/102", "The Grand Hotel/202", "The Grand Hotel/302"}; !slices.Equal(got, want) {
+		t.Fatalf("after a booked room: got %v\nwant %v", got, want)
 	}
 }
 

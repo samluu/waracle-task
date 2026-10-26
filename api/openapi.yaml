@@ -62,6 +62,9 @@ paths:
       description: |
         Rooms that are free for every night of the stay and can hold the given number of guests,
         across all hotels or just the one named. Sorted by hotel name, then room number.
+
+        Results are paged. To get the next page, repeat the request with `cursor` set to the
+        response's `next_cursor`; the last page has no `next_cursor`. Cursors are opaque.
       parameters:
         - name: check_in
           in: query
@@ -92,15 +95,29 @@ paths:
           schema:
             type: string
           example: The Grand Hotel
+        - name: limit
+          in: query
+          required: false
+          description: Rooms per page. Defaults to 20.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          example: 20
+        - name: cursor
+          in: query
+          required: false
+          description: The `next_cursor` from the previous page. Omit for the first page.
+          schema:
+            type: string
       responses:
         "200":
-          description: Available rooms.
+          description: A page of available rooms.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Room"
+                $ref: "#/components/schemas/RoomPage"
         "400":
           $ref: "#/components/responses/BadRequest"
 
@@ -245,6 +262,18 @@ components:
           example: 1
         hotel:
           $ref: "#/components/schemas/Hotel"
+
+    RoomPage:
+      type: object
+      required: [rooms]
+      properties:
+        rooms:
+          type: array
+          items:
+            $ref: "#/components/schemas/Room"
+        next_cursor:
+          type: string
+          description: Pass as `cursor` to get the next page. Absent on the last page.
 
     BookingRequest:
       type: object

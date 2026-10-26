@@ -61,7 +61,7 @@ make test
 | Method | Path | Does |
 |---|---|---|
 | GET | `/hotels?name=` | Find a hotel by its exact name |
-| GET | `/rooms?check_in=&check_out=&guests=[&hotel_name=]` | Rooms free for the whole stay that can hold the guests, in every hotel or just the one named |
+| GET | `/rooms?check_in=&check_out=&guests=[&hotel_name=][&limit=][&cursor=]` | Rooms free for the whole stay that can hold the guests, in every hotel or just the one named. Paged: up to `limit` rooms (default 20, max 100) per page; pass the response's `next_cursor` as `cursor` for the next page |
 | POST | `/bookings` | Book a room (`room_id` comes from `GET /rooms`) |
 | GET | `/bookings/{reference}` | Booking details |
 

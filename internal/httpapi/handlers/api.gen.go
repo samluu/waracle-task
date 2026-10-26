@@ -118,6 +118,13 @@ type Room struct {
 	Type   RoomType `json:"type"`
 }
 
+// RoomPage defines model for RoomPage.
+type RoomPage struct {
+	// NextCursor Pass as `cursor` to get the next page. Absent on the last page.
+	NextCursor *string `json:"next_cursor,omitempty"`
+	Rooms      []Room  `json:"rooms"`
+}
+
 // RoomType defines model for RoomType.
 type RoomType string
 
@@ -139,6 +146,12 @@ type FindRoomsParams struct {
 
 	// HotelName Only search this hotel (exact name). Omit to search every hotel.
 	HotelName *string `form:"hotel_name,omitempty" json:"hotel_name,omitempty"`
+
+	// Limit Rooms per page. Defaults to 20.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor The `next_cursor` from the previous page. Omit for the first page.
+	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
 // CreateBookingJSONRequestBody defines body for CreateBooking for application/json ContentType.
@@ -316,6 +329,32 @@ func (siw *ServerInterfaceWrapper) FindRooms(w http.ResponseWriter, r *http.Requ
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "hotel_name"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "hotel_name", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
 		}
 		return
 	}
@@ -693,7 +732,7 @@ type FindRoomsResponseObject interface {
 	VisitFindRoomsResponse(w http.ResponseWriter) error
 }
 
-type FindRooms200JSONResponse []Room
+type FindRooms200JSONResponse RoomPage
 
 func (response FindRooms200JSONResponse) VisitFindRoomsResponse(w http.ResponseWriter) error {
 
