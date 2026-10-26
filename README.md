@@ -18,6 +18,7 @@
 - when searching for a room, the filters are an optional hotel name, number of guests and a date range. The search is applied to all matching hotels and rooms
 - when searching for a hotel by name, it has to be an exact match
 - hotel names are unique
+- seeding gives some fixed data that can be reset. Not generating random data as that's more useful for load testing whilst the fixed data is better for manual tests
 
 ## Requirements
 
