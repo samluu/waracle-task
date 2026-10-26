@@ -36,8 +36,8 @@ func TestSeedAndReset(t *testing.T) {
 	if got := count(`SELECT count(*) FROM hotels`); got != len(seedHotels) {
 		t.Errorf("hotels = %d, want %d", got, len(seedHotels))
 	}
-	if got := count(`SELECT count(*) FROM bookings`); got != len(seedBookings) {
-		t.Errorf("bookings = %d, want %d", got, len(seedBookings))
+	if got := count(`SELECT count(*) FROM bookings`); got != 0 {
+		t.Errorf("bookings = %d, want 0: seeding is only hotels and rooms", got)
 	}
 	// Business rules the schema doesn't enforce, so the seed data has to.
 	if got := count(`SELECT count(*) FROM (SELECT hotel_id FROM rooms GROUP BY hotel_id HAVING count(*) <> 6) x`); got != 0 {
@@ -45,10 +45,6 @@ func TestSeedAndReset(t *testing.T) {
 	}
 	if got := count(`SELECT count(*) FROM (SELECT hotel_id, type FROM rooms GROUP BY hotel_id, type HAVING count(*) <> 2) x`); got != 0 {
 		t.Errorf("%d hotel/type pairs don't have exactly 2 rooms", got)
-	}
-	if got := count(`SELECT count(*) FROM bookings b JOIN rooms r ON r.id = b.room_id
-		JOIN room_types rt ON rt.type = r.type WHERE b.guests > rt.capacity`); got != 0 {
-		t.Errorf("%d bookings exceed their room's capacity", got)
 	}
 
 	// Seeding again must fail cleanly rather than duplicate data. The failed insert aborts the
@@ -74,6 +70,11 @@ func TestReset(t *testing.T) {
 	}
 	if err := seed(ctx, tx); err != nil {
 		t.Fatalf("seed: %v", err)
+	}
+	// Seeding adds no bookings, so make one as the API would, for reset to remove.
+	if _, err := tx.ExecContext(ctx, `INSERT INTO bookings (room_id, guest_name, guests, check_in, check_out)
+		SELECT id, 'Guest', 1, '2027-01-11', '2027-01-12' FROM rooms LIMIT 1`); err != nil {
+		t.Fatalf("insert booking: %v", err)
 	}
 	if err := reset(ctx, tx); err != nil {
 		t.Fatalf("reset: %v", err)

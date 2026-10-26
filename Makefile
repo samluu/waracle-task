@@ -40,7 +40,7 @@ migrate: ## Apply pending migrations to the compose db (`make up` also does this
 migrate-status: ## Show which migrations have been applied
 	docker compose run --rm --build migrate status
 
-seed: ## Insert the test hotels, rooms and bookings (fails if already seeded; `make reset` first)
+seed: ## Insert the test hotels and rooms (fails if already seeded; `make reset` first)
 	docker compose run --rm --build --entrypoint /devdata api seed
 
 reset: ## Remove all hotels, rooms and bookings

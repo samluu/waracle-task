@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// The seed data (seed.go) has 2 hotels with rooms 101-102 single, 201-202 double, 301-302 deluxe. At The Grand Hotel: 101 booked 11-13 Jan, 201 booked 10-14 and 14-16 Jan,
-// 301 booked 12-15 Jan; and at Seaside Inn: 202 booked 11-12 Jan (all 2027).
+// The seed data (seed.go) has 2 hotels with rooms 101-102 single, 201-202 double, 301-302 deluxe, and seededTestStore adds testBookings. At The Grand Hotel: 101 booked
+// 11-13 Jan, 201 booked 10-14 and 14-16 Jan, 301 booked 12-15 Jan; and at Seaside Inn: 202 booked 11-12 Jan (all 2027).
 
 func roomID(t *testing.T, s *Store, hotel, number string) int64 {
 	t.Helper()

@@ -206,7 +206,7 @@ paths:
           schema:
             type: string
             format: uuid
-          example: 5eed0000-0000-4000-8000-000000000001
+          example: 3f2b8c1e-9a4d-4c6e-b1f0-7d2e5a9c4b13
       responses:
         "200":
           description: The booking.
@@ -229,9 +229,9 @@ paths:
       summary: Seed test data
       description: |
         For testing. Adds two hotels ("The Grand Hotel" and "Seaside Inn"), each with six rooms (two
-        single, two double, two deluxe), and five bookings in January 2027 with the fixed references
-        5eed0000-0000-4000-8000-000000000001 to ...005. Fails if the data is already there: reset first.
-        Like the rest of the API it needs no authentication, so it isn't for production use.
+        single, two double, two deluxe). It adds no bookings: make them with `POST /bookings`. Fails if
+        the data is already there: reset first. Like the rest of the API it needs no authentication, so
+        it isn't for production use.
       responses:
         "204":
           description: Seeded.

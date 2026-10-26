@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -22,14 +21,6 @@ type seedRoom struct {
 	roomType RoomType
 }
 
-type seedBooking struct {
-	reference         string
-	hotel, room       string
-	guestName         string
-	guests            int
-	checkIn, checkOut string // YYYY-MM-DD
-}
-
 // Every hotel gets the same six rooms: two of each type.
 var seedRooms = []seedRoom{
 	{"101", RoomTypeSingle}, {"102", RoomTypeSingle},
@@ -42,17 +33,8 @@ var seedHotels = []seedHotel{
 	{name: "Seaside Inn", rooms: seedRooms},
 }
 
-// Fixed references (recognisable "5eed..." UUIDs) and dates so testers know what to search for. Over 11-13 Jan 2027 at The Grand Hotel,
-// one room of each type is booked and the other is free.
-var seedBookings = []seedBooking{
-	{"5eed0000-0000-4000-8000-000000000001", "The Grand Hotel", "101", "Alice Smith", 1, "2027-01-11", "2027-01-13"},
-	{"5eed0000-0000-4000-8000-000000000002", "The Grand Hotel", "201", "Bob Jones", 2, "2027-01-10", "2027-01-14"},
-	{"5eed0000-0000-4000-8000-000000000003", "The Grand Hotel", "301", "Carol White", 4, "2027-01-12", "2027-01-15"},
-	{"5eed0000-0000-4000-8000-000000000004", "The Grand Hotel", "201", "Dan Brown", 2, "2027-01-14", "2027-01-16"}, // checks in the day booking 2 checks out
-	{"5eed0000-0000-4000-8000-000000000005", "Seaside Inn", "202", "Erin Green", 1, "2027-01-11", "2027-01-12"},
-}
-
-// Seed inserts the test hotels, rooms and bookings in one transaction.
+// Seed inserts the test hotels and rooms in one transaction. It adds no bookings: bookings can't start in
+// the past, so seeded ones with fixed dates would eventually stop working. Testers make them with the API.
 func (s *Store) Seed(ctx context.Context) error {
 	return s.inTx(ctx, seed)
 }
@@ -75,7 +57,6 @@ func (s *Store) inTx(ctx context.Context, fn func(context.Context, *sqlx.Tx) err
 }
 
 func seed(ctx context.Context, tx *sqlx.Tx) error {
-	roomIDs := map[[2]string]int64{} // {hotel name, room number} -> room id
 	for _, h := range seedHotels {
 		var hotelID int64
 		err := tx.GetContext(ctx, &hotelID, `INSERT INTO hotels (name) VALUES ($1) RETURNING id`, h.name)
@@ -86,34 +67,11 @@ func seed(ctx context.Context, tx *sqlx.Tx) error {
 			return fmt.Errorf("insert hotel %q: %w", h.name, err)
 		}
 		for _, r := range h.rooms {
-			var roomID int64
-			if err := tx.GetContext(ctx, &roomID,
-				`INSERT INTO rooms (hotel_id, number, type) VALUES ($1, $2, $3) RETURNING id`,
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO rooms (hotel_id, number, type) VALUES ($1, $2, $3)`,
 				hotelID, r.number, r.roomType); err != nil {
 				return fmt.Errorf("insert room %s/%s: %w", h.name, r.number, err)
 			}
-			roomIDs[[2]string{h.name, r.number}] = roomID
-		}
-	}
-
-	for _, b := range seedBookings {
-		roomID, ok := roomIDs[[2]string{b.hotel, b.room}]
-		if !ok {
-			return fmt.Errorf("booking %s: unknown room %s/%s", b.reference, b.hotel, b.room)
-		}
-		checkIn, err := time.Parse(time.DateOnly, b.checkIn)
-		if err != nil {
-			return fmt.Errorf("booking %s: %w", b.reference, err)
-		}
-		checkOut, err := time.Parse(time.DateOnly, b.checkOut)
-		if err != nil {
-			return fmt.Errorf("booking %s: %w", b.reference, err)
-		}
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO bookings (reference, room_id, guest_name, guests, check_in, check_out)
-			 VALUES ($1, $2, $3, $4, $5, $6)`,
-			b.reference, roomID, b.guestName, b.guests, checkIn, checkOut); err != nil {
-			return fmt.Errorf("insert booking %s: %w", b.reference, err)
 		}
 	}
 	return nil

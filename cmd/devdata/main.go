@@ -1,4 +1,4 @@
-// Command devdata seeds the database with test hotels, rooms and bookings, or resets it.
+// Command devdata seeds the database with test hotels and rooms, or resets it.
 //
 //	devdata seed
 //	devdata reset

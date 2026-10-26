@@ -44,7 +44,24 @@ func date(s string) time.Time {
 	return d
 }
 
-// seededTestStore is openTestStore with the database reset and freshly seeded.
+// testBookings are the bookings the query tests search around, added by seededTestStore. The store
+// doesn't check dates against today, so fixed dates don't go stale here. Over 11-13 Jan at The Grand
+// Hotel, one room of each type is booked and the other is free.
+var testBookings = []struct {
+	reference         string
+	hotel, room       string
+	guestName         string
+	guests            int
+	checkIn, checkOut string
+}{
+	{"5eed0000-0000-4000-8000-000000000001", "The Grand Hotel", "101", "Alice Smith", 1, "2027-01-11", "2027-01-13"},
+	{"5eed0000-0000-4000-8000-000000000002", "The Grand Hotel", "201", "Bob Jones", 2, "2027-01-10", "2027-01-14"},
+	{"5eed0000-0000-4000-8000-000000000003", "The Grand Hotel", "301", "Carol White", 4, "2027-01-12", "2027-01-15"},
+	{"5eed0000-0000-4000-8000-000000000004", "The Grand Hotel", "201", "Dan Brown", 2, "2027-01-14", "2027-01-16"}, // checks in the day booking 2 checks out
+	{"5eed0000-0000-4000-8000-000000000005", "Seaside Inn", "202", "Erin Green", 1, "2027-01-11", "2027-01-12"},
+}
+
+// seededTestStore is openTestStore with the database reset, freshly seeded, and testBookings added.
 func seededTestStore(t *testing.T) *Store {
 	t.Helper()
 	s := openTestStore(t)
@@ -53,6 +70,13 @@ func seededTestStore(t *testing.T) *Store {
 	}
 	if err := s.Seed(t.Context()); err != nil {
 		t.Fatalf("seed: %v", err)
+	}
+	for _, b := range testBookings {
+		if _, err := s.db.ExecContext(t.Context(),
+			`INSERT INTO bookings (reference, room_id, guest_name, guests, check_in, check_out) VALUES ($1, $2, $3, $4, $5, $6)`,
+			b.reference, roomID(t, s, b.hotel, b.room), b.guestName, b.guests, date(b.checkIn), date(b.checkOut)); err != nil {
+			t.Fatalf("insert booking %s: %v", b.reference, err)
+		}
 	}
 	return s
 }

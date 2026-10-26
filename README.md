@@ -21,6 +21,7 @@ I used Claude Code throughout to do the following:
 - searching by hotel name is fuzzy and uses Postgres trigram word similarity
 - hotel names are unique
 - seeding gives some fixed data that can be reset. Not generating random data as that's more useful for load testing whilst the fixed data is better for manual tests
+- seeding is just hotels and rooms, no bookings
 - when booking check in has to be between today and a year from now. I believe hotels usually have a limit to how far in advanced you can book.
 - when booking, a stay can be at most 30 nights. There are probably local laws restricting how long you can stay in a hotel in one go
 - the 2 second delay mentioned in the spec is assumed to simulate a email send delay
@@ -38,12 +39,10 @@ I used Claude Code throughout to do the following:
 ```
 cp .env.example .env
 make up      # start Postgres and the API at http://localhost:8080, applying migrations
-make seed    # add test data: 2 hotels, 6 rooms each, 5 bookings in January 2027
+make seed    # add test data: 2 hotels, 6 rooms each, no bookings
 make reset   # remove all data, e.g. to seed again
 make down    # stop
 ```
-
-The seeded bookings have references `5eed0000-0000-4000-8000-000000000001` to `...005`.
 
 ## API
 
