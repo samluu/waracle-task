@@ -1,0 +1,44 @@
+openapi: 3.0.3
+info:
+  title: Hotel Booking API
+  version: 0.1.0
+  description: Hotel room booking API for the Waracle Backend Developer Challenge.
+servers:
+  - url: http://localhost:8080
+
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Service health
+      description: Reports whether the API is up and can reach the database.
+      responses:
+        "200":
+          description: API and database are reachable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: The database is unreachable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: ok
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: database unavailable

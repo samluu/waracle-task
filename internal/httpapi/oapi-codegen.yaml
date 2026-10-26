@@ -1,0 +1,6 @@
+# Config for `make generate`: types + a Go 1.22+ net/http ServeMux server from api/openapi.yaml.
+package: httpapi
+output: api.gen.go
+generate:
+  models: true
+  std-http-server: true
