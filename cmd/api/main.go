@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -49,11 +50,20 @@ func run() error {
 		IdleTimeout:       60 * time.Second,
 	}
 
+	// Listen before serving so a bind failure (e.g. port in use) returns here,
+	// before the shutdown goroutine starts and before we log "listening".
+	var lc net.ListenConfig
+	ln, err := lc.Listen(ctx, "tcp", srv.Addr)
+	if err != nil {
+		return err
+	}
+
 	shutdownDone := make(chan struct{})
 	go func() {
 		<-ctx.Done()
 		slog.Info("shutting down")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		// Under docker's 10s stop grace period, so shutdown finishes before SIGKILL.
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := srv.Shutdown(shutdownCtx); err != nil {
 			slog.Error("shutdown", "err", err)
@@ -61,11 +71,11 @@ func run() error {
 		close(shutdownDone)
 	}()
 
-	slog.Info("listening", "addr", srv.Addr)
-	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+	slog.Info("listening", "addr", ln.Addr().String())
+	if err := srv.Serve(ln); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
-	// ListenAndServe returns as soon as Shutdown starts; wait for in-flight requests.
+	// Serve returns as soon as Shutdown starts; wait for in-flight requests.
 	<-shutdownDone
 	return nil
 }
