@@ -6,16 +6,14 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-)
 
-func badRequest(msg string) BadRequestJSONResponse {
-	return BadRequestJSONResponse{Error: msg}
-}
+	"github.com/samluu/waracle-task/internal/httpapi/handlers"
+)
 
 func writeError(w http.ResponseWriter, status int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(Error{Error: msg}); err != nil {
+	if err := json.NewEncoder(w).Encode(handlers.Error{Error: msg}); err != nil {
 		slog.Error("write response", "err", err)
 	}
 }

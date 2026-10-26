@@ -78,7 +78,7 @@ The API is defined in [api/openapi.yaml](api/openapi.yaml). With the server runn
 - http://localhost:8080/docs: Swagger UI, to browse the endpoints and call them with "Try it out"
 - http://localhost:8080/openapi.yaml: the spec the running server was built from, e.g. to import into Postman
 
-The spec is the source of truth: the routes and request/response types in `internal/httpapi/api.gen.go` are generated from it with [oapi-codegen](https://github.com/oapi-codegen/oapi-codegen). After changing the spec, run:
+The spec is the source of truth: the routes and request/response types in `internal/httpapi/handlers/api.gen.go` are generated from it with [oapi-codegen](https://github.com/oapi-codegen/oapi-codegen). After changing the spec, run:
 ```
 make generate
 ```

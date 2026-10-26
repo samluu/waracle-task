@@ -29,9 +29,9 @@ generate: ## Regenerate server code from api/openapi.yaml and test mocks from th
 
 # Compares the generated files before and after regenerating, not against git, so it also works with uncommitted spec changes.
 check-generate: ## Fail if generated code is out of date with the spec or the mocked interfaces
-	@before=$$(find . \( -name '*.gen.go' -o -name '*_mock_test.go' \) -exec shasum {} + | sort); \
+	@before=$$(find . -name '*.gen.go' -exec shasum {} + | sort); \
 	go generate ./...; \
-	after=$$(find . \( -name '*.gen.go' -o -name '*_mock_test.go' \) -exec shasum {} + | sort); \
+	after=$$(find . -name '*.gen.go' -exec shasum {} + | sort); \
 	if [ "$$before" != "$$after" ]; then echo "generated code was out of date (now regenerated): run make generate and commit"; exit 1; fi
 
 migrate: ## Apply pending migrations to the compose db (`make up` also does this before starting the API)

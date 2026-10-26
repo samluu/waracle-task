@@ -1,18 +1,20 @@
-package httpapi
+package handlers
 
 import (
 	"errors"
 	"testing"
+
+	"github.com/samluu/waracle-task/internal/httpapi/handlers/mocks"
 )
 
 func TestGetHealth(t *testing.T) {
 	tests := []struct {
 		name     string
-		newStore func() *StoreMock
+		newStore func() *mocks.StoreMock
 		want     GetHealthResponseObject
 	}{
-		{"db up", pingReturns(nil), GetHealth200JSONResponse{Status: "ok"}},
-		{"db down", pingReturns(errors.New("boom")), GetHealth503JSONResponse{Error: "database unavailable"}},
+		{"db up", mocks.PingReturns(nil), GetHealth200JSONResponse{Status: "ok"}},
+		{"db down", mocks.PingReturns(errors.New("boom")), GetHealth503JSONResponse{Error: "database unavailable"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

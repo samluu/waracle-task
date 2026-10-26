@@ -1,6 +1,6 @@
 # Config for `make generate`: types, a Go 1.22+ net/http ServeMux server, and the strict wrapper that
 # decodes requests into typed objects and encodes typed responses, from api/openapi.yaml.
-package: httpapi
+package: handlers
 output: api.gen.go
 generate:
   models: true

@@ -1,8 +1,9 @@
-package httpapi
+package handlers
 
 import (
 	"testing"
 
+	"github.com/samluu/waracle-task/internal/httpapi/handlers/mocks"
 	"github.com/samluu/waracle-task/internal/store"
 )
 
@@ -10,17 +11,17 @@ func TestFindHotels(t *testing.T) {
 	tests := []struct {
 		name     string
 		params   FindHotelsParams
-		newStore func() *StoreMock
+		newStore func() *mocks.StoreMock
 		want     FindHotelsResponseObject
 		wantErr  error
 	}{
-		{"found", FindHotelsParams{Name: "The Grand Hotel"}, findHotelReturns(store.Hotel{ID: 1, Name: "The Grand Hotel"}, nil),
+		{"found", FindHotelsParams{Name: "The Grand Hotel"}, mocks.FindHotelReturns(store.Hotel{ID: 1, Name: "The Grand Hotel"}, nil),
 			FindHotels200JSONResponse{{Id: 1, Name: "The Grand Hotel"}}, nil},
-		{"not found is an empty list", FindHotelsParams{Name: "Nope"}, findHotelReturns(store.Hotel{}, store.ErrNotFound),
+		{"not found is an empty list", FindHotelsParams{Name: "Nope"}, mocks.FindHotelReturns(store.Hotel{}, store.ErrNotFound),
 			FindHotels200JSONResponse{}, nil},
-		{"blank name", FindHotelsParams{Name: " "}, noStore,
+		{"blank name", FindHotelsParams{Name: " "}, mocks.NoStore,
 			FindHotels400JSONResponse{badRequest("name is required")}, nil},
-		{"store failure is returned", FindHotelsParams{Name: "X"}, findHotelReturns(store.Hotel{}, errStore),
+		{"store failure is returned", FindHotelsParams{Name: "X"}, mocks.FindHotelReturns(store.Hotel{}, errStore),
 			nil, errStore},
 	}
 	for _, tt := range tests {
