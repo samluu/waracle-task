@@ -35,58 +35,26 @@ I used Claude Code throughout to do the following:
 
 ## Setup
 
-Start server
 ```
 cp .env.example .env
-make up
+make up      # start Postgres and the API at http://localhost:8080, applying migrations
+make seed    # add test data: 2 hotels, 6 rooms each, 5 bookings in January 2027
+make reset   # remove all data, e.g. to seed again
+make down    # stop
 ```
-This builds the image, starts Postgres, applies database migrations, then starts the API at http://localhost:8080:
-```
-curl localhost:8080/health   # {"status":"ok"}
-```
-Stop it with `make down`.
 
-Migrations live in [migrations/](migrations) and are run with the [goose](https://github.com/pressly/goose) CLI in a container: `make migrate` applies pending ones to a running database, `make migrate-status` lists what has been applied.
-
-Test data
-```
-make seed    # 2 hotels ("The Grand Hotel", "Seaside Inn"), 6 rooms each, 5 bookings
-make reset   # remove all hotels, rooms and bookings
-```
-The API does the same with `POST /admin/seed` and `POST /admin/reset`, e.g. from Swagger UI. Seeding fails if the data is already there, so reset first to start again. The bookings have fixed references, UUIDs `5eed0000-0000-4000-8000-000000000001` to `...005`, and are all in January 2027; see [internal/store/seed.go](internal/store/seed.go).
-
-Run tests
-```
-make test
-```
-`make test-integration` also runs the database tests, against a separate `hotel_test` database in the compose Postgres that it creates and migrates, so your dev data is untouched. Run the linter with `make lint`.
+The seeded bookings have references `5eed0000-0000-4000-8000-000000000001` to `...005`.
 
 ## API
 
-| Method | Path | Does |
-|---|---|---|
-| GET | `/hotels?name=[&limit=][&cursor=]` | Hotels whose name is a fuzzy match for `name` (ignoring case, whole or partial words, small misspellings), sorted by name. `name` is required. Paged like `/rooms` |
-| GET | `/rooms?check_in=&check_out=&guests=[&hotel_name=][&limit=][&cursor=]` | Rooms free for the whole stay that can hold the guests, in every hotel or only those whose name is a fuzzy match for `hotel_name`, as `/hotels` matches. Paged: up to `limit` rooms (default 20, max 100) per page; pass the response's `next_cursor` as `cursor` for the next page |
-| POST | `/bookings` | Book a room (`room_id` comes from `GET /rooms`) |
-| GET | `/bookings/{reference}` | Booking details |
-| POST | `/admin/seed` | Add the test data (204; 409 if it's already there). For testing: like the rest of the API, it needs no authentication |
-| POST | `/admin/reset` | Remove all hotels, rooms and bookings (204), ready for seeding |
+With the server running, browse and try the endpoints at http://localhost:8080/docs.
 
-For example, after `make seed` or `POST /admin/seed`:
-```
-curl 'localhost:8080/rooms?check_in=2027-01-11&check_out=2027-01-13&guests=1&hotel_name=grand'
-curl -X POST localhost:8080/bookings -d '{"room_id":2,"guest_name":"Jane Doe","guests":1,"check_in":"2027-01-11","check_out":"2027-01-13"}'
-curl localhost:8080/bookings/5eed0000-0000-4000-8000-000000000001
-```
-A booking that clashes with another is 409, too many guests for the room is 422, and invalid input is 400; errors are `{"error": "..."}`.
+The API is defined in [api/openapi.yaml](api/openapi.yaml), and the server code is generated from it with `make generate`.
 
-The API is defined in [api/openapi.yaml](api/openapi.yaml). With the server running:
+## Tests
 
-- http://localhost:8080/docs: Swagger UI, to browse the endpoints and call them with "Try it out"
-- http://localhost:8080/openapi.yaml: the spec the running server was built from, e.g. to import into Postman
-
-The spec is the source of truth: the routes and request/response types in `internal/httpapi/handlers/api.gen.go` are generated from it with [oapi-codegen](https://github.com/oapi-codegen/oapi-codegen). After changing the spec, run:
 ```
-make generate
+make test              # unit tests
+make test-integration  # also database tests, in a separate database so your data is untouched
+make lint
 ```
-The build fails if a handler for an operation in the spec is missing, and CI fails if the generated code is out of date with the spec.
