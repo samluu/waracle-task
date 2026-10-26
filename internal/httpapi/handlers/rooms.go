@@ -2,15 +2,9 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/samluu/waracle-task/internal/store"
-)
-
-const (
-	defaultRoomPageSize = 20
-	maxRoomPageSize     = 100
 )
 
 func (s *Server) FindRooms(ctx context.Context, req FindRoomsRequestObject) (FindRoomsResponseObject, error) {
@@ -22,12 +16,9 @@ func (s *Server) FindRooms(ctx context.Context, req FindRoomsRequestObject) (Fin
 		return FindRooms400JSONResponse{badRequest(err.Error())}, nil
 	}
 
-	limit := defaultRoomPageSize
-	if params.Limit != nil {
-		limit = *params.Limit
-	}
-	if limit < 1 || limit > maxRoomPageSize {
-		return FindRooms400JSONResponse{badRequest(fmt.Sprintf("limit must be between 1 and %d", maxRoomPageSize))}, nil
+	limit, err := pageSize(params.Limit)
+	if err != nil {
+		return FindRooms400JSONResponse{badRequest(err.Error())}, nil
 	}
 	var hotelSearch *string
 	if params.HotelName != nil {
@@ -39,11 +30,11 @@ func (s *Server) FindRooms(ctx context.Context, req FindRoomsRequestObject) (Fin
 	}
 	var after *store.RoomKey
 	if params.Cursor != nil {
-		key, err := decodeCursor(*params.Cursor)
+		c, err := decodeCursor[roomCursor](*params.Cursor)
 		if err != nil {
 			return FindRooms400JSONResponse{badRequest(err.Error())}, nil
 		}
-		after = &key
+		after = &store.RoomKey{HotelName: c.HotelName, Number: c.Number}
 	}
 
 	// Ask for one more room than the page holds: if it comes back, there's a next page.
@@ -63,7 +54,7 @@ func (s *Server) FindRooms(ctx context.Context, req FindRoomsRequestObject) (Fin
 	if len(rooms) > limit {
 		rooms = rooms[:limit]
 		last := rooms[len(rooms)-1]
-		next := encodeCursor(store.RoomKey{HotelName: last.HotelName, Number: last.Number})
+		next := encodeCursor(roomCursor{HotelName: last.HotelName, Number: last.Number})
 		page.NextCursor = &next
 	}
 	for _, room := range rooms {

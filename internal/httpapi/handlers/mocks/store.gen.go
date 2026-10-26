@@ -19,7 +19,7 @@ import (
 //			CreateBookingFunc: func(ctx context.Context, nb store.NewBooking) (store.BookingDetails, error) {
 //				panic("mock out the CreateBooking method")
 //			},
-//			FindHotelsFunc: func(ctx context.Context, search string) ([]store.Hotel, error) {
+//			FindHotelsFunc: func(ctx context.Context, f store.HotelFilter) ([]store.Hotel, error) {
 //				panic("mock out the FindHotels method")
 //			},
 //			FindRoomsFunc: func(ctx context.Context, f store.RoomFilter) ([]store.Room, error) {
@@ -42,7 +42,7 @@ type StoreMock struct {
 	CreateBookingFunc func(ctx context.Context, nb store.NewBooking) (store.BookingDetails, error)
 
 	// FindHotelsFunc mocks the FindHotels method.
-	FindHotelsFunc func(ctx context.Context, search string) ([]store.Hotel, error)
+	FindHotelsFunc func(ctx context.Context, f store.HotelFilter) ([]store.Hotel, error)
 
 	// FindRoomsFunc mocks the FindRooms method.
 	FindRoomsFunc func(ctx context.Context, f store.RoomFilter) ([]store.Room, error)
@@ -66,8 +66,8 @@ type StoreMock struct {
 		FindHotels []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// Search is the search argument value.
-			Search string
+			// F is the f argument value.
+			F store.HotelFilter
 		}
 		// FindRooms holds details about calls to the FindRooms method.
 		FindRooms []struct {
@@ -133,21 +133,21 @@ func (mock *StoreMock) CreateBookingCalls() []struct {
 }
 
 // FindHotels calls FindHotelsFunc.
-func (mock *StoreMock) FindHotels(ctx context.Context, search string) ([]store.Hotel, error) {
+func (mock *StoreMock) FindHotels(ctx context.Context, f store.HotelFilter) ([]store.Hotel, error) {
 	if mock.FindHotelsFunc == nil {
 		panic("StoreMock.FindHotelsFunc: method is nil but Store.FindHotels was just called")
 	}
 	callInfo := struct {
-		Ctx    context.Context
-		Search string
+		Ctx context.Context
+		F   store.HotelFilter
 	}{
-		Ctx:    ctx,
-		Search: search,
+		Ctx: ctx,
+		F:   f,
 	}
 	mock.lockFindHotels.Lock()
 	mock.calls.FindHotels = append(mock.calls.FindHotels, callInfo)
 	mock.lockFindHotels.Unlock()
-	return mock.FindHotelsFunc(ctx, search)
+	return mock.FindHotelsFunc(ctx, f)
 }
 
 // FindHotelsCalls gets all the calls that were made to FindHotels.
@@ -155,12 +155,12 @@ func (mock *StoreMock) FindHotels(ctx context.Context, search string) ([]store.H
 //
 //	len(mockedStore.FindHotelsCalls())
 func (mock *StoreMock) FindHotelsCalls() []struct {
-	Ctx    context.Context
-	Search string
+	Ctx context.Context
+	F   store.HotelFilter
 } {
 	var calls []struct {
-		Ctx    context.Context
-		Search string
+		Ctx context.Context
+		F   store.HotelFilter
 	}
 	mock.lockFindHotels.RLock()
 	calls = mock.calls.FindHotels

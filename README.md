@@ -60,7 +60,7 @@ make test
 
 | Method | Path | Does |
 |---|---|---|
-| GET | `/hotels?name=` | Hotels whose name is a fuzzy match for `name` (ignoring case, whole or partial words, small misspellings), sorted by name |
+| GET | `/hotels?name=[&limit=][&cursor=]` | Hotels whose name is a fuzzy match for `name` (ignoring case, whole or partial words, small misspellings), sorted by name. `name` is required. Paged like `/rooms` |
 | GET | `/rooms?check_in=&check_out=&guests=[&hotel_name=][&limit=][&cursor=]` | Rooms free for the whole stay that can hold the guests, in every hotel or only those whose name is a fuzzy match for `hotel_name`, as `/hotels` matches. Paged: up to `limit` rooms (default 20, max 100) per page; pass the response's `next_cursor` as `cursor` for the next page |
 | POST | `/bookings` | Book a room (`room_id` comes from `GET /rooms`) |
 | GET | `/bookings/{reference}` | Booking details |

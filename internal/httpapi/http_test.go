@@ -102,3 +102,28 @@ func TestHTTPRoomPage(t *testing.T) {
 	}}, http.MethodGet, search, ""),
 		http.StatusOK, `{"rooms":[]}`)
 }
+
+// Pins the hotel search's page format, as TestHTTPRoomPage does for rooms.
+func TestHTTPHotelPage(t *testing.T) {
+	const search = "/hotels?name=hotel&limit=1"
+	hotels := func(hs ...store.Hotel) *mocks.StoreMock {
+		return &mocks.StoreMock{FindHotelsFunc: func(context.Context, store.HotelFilter) ([]store.Hotel, error) { return hs, nil }}
+	}
+	grand, seaside := store.Hotel{ID: 1, Name: "The Grand Hotel"}, store.Hotel{ID: 2, Name: "Seaside Inn"}
+
+	var page struct {
+		Hotels     []json.RawMessage `json:"hotels"`
+		NextCursor *string           `json:"next_cursor"`
+	}
+	rec := serve(t, hotels(seaside, grand), http.MethodGet, search, "") // one more than the page: there's a next page
+	if err := json.Unmarshal(rec.Body.Bytes(), &page); err != nil || rec.Code != http.StatusOK {
+		t.Fatalf("status %d, body %s (%v)", rec.Code, rec.Body, err)
+	}
+	if len(page.Hotels) != 1 || page.NextCursor == nil || *page.NextCursor == "" {
+		t.Fatalf("want 1 hotel and a next_cursor, got %s", rec.Body)
+	}
+	assertJSON(t, serve(t, hotels(grand), http.MethodGet, search, ""),
+		http.StatusOK, `{"hotels":[{"id":1,"name":"The Grand Hotel"}]}`)
+	assertJSON(t, serve(t, hotels(), http.MethodGet, search, ""),
+		http.StatusOK, `{"hotels":[]}`)
+}

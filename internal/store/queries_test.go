@@ -48,7 +48,7 @@ func TestFindHotels(t *testing.T) {
 		{"_", nil},
 	} {
 		t.Run(tt.search, func(t *testing.T) {
-			hotels, err := s.FindHotels(t.Context(), tt.search)
+			hotels, err := s.FindHotels(t.Context(), HotelFilter{Search: tt.search, Limit: 100})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -63,6 +63,42 @@ func TestFindHotels(t *testing.T) {
 				t.Fatalf("got %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// Paging through the matches, 2 at a time, returns each matching hotel exactly once, in name order.
+func TestFindHotelsPages(t *testing.T) {
+	s := seededTestStore(t)
+	for _, name := range []string{"Grand Seaside Resort", "Grand Lake Lodge", "Little Grand Inn"} {
+		if _, err := s.db.ExecContext(t.Context(), `INSERT INTO hotels (name) VALUES ($1)`, name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	page := func(after *string) []string {
+		t.Helper()
+		hotels, err := s.FindHotels(t.Context(), HotelFilter{Search: "grand", After: after, Limit: 2})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, h := range hotels {
+			got = append(got, h.Name)
+		}
+		return got
+	}
+
+	// "Seaside Inn" doesn't match "grand", so it never appears.
+	pages := [][]string{{"Grand Lake Lodge", "Grand Seaside Resort"}, {"Little Grand Inn", "The Grand Hotel"}}
+	var after *string
+	for i, want := range pages {
+		got := page(after)
+		if !slices.Equal(got, want) {
+			t.Fatalf("page %d: got %v, want %v", i+1, got, want)
+		}
+		after = &got[len(got)-1]
+	}
+	if got := page(after); got != nil {
+		t.Fatalf("after the last match: got %v, want nothing", got)
 	}
 }
 

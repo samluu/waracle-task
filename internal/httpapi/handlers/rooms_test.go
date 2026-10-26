@@ -63,7 +63,7 @@ func TestFindRooms(t *testing.T) {
 				return storeRooms(21), nil
 			}},
 			FindRooms200JSONResponse{Rooms: apiRooms(20),
-				NextCursor: new(encodeCursor(store.RoomKey{HotelName: "The Grand Hotel", Number: "20"}))}, nil},
+				NextCursor: new(encodeCursor(roomCursor{HotelName: "The Grand Hotel", Number: "20"}))}, nil},
 		{"more than a given limit", func() FindRoomsParams {
 			p := validRoomSearch()
 			p.Limit = new(2)
@@ -73,7 +73,7 @@ func TestFindRooms(t *testing.T) {
 				return storeRooms(3), nil
 			}},
 			FindRooms200JSONResponse{Rooms: apiRooms(2),
-				NextCursor: new(encodeCursor(store.RoomKey{HotelName: "The Grand Hotel", Number: "2"}))}, nil},
+				NextCursor: new(encodeCursor(roomCursor{HotelName: "The Grand Hotel", Number: "2"}))}, nil},
 		{"limit over the maximum", func() FindRoomsParams {
 			p := validRoomSearch()
 			p.Limit = new(101)
