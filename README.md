@@ -8,6 +8,12 @@
 
 ## Assumptions
 
+- the 3 hotel room types implies the capacity, so single is 1, double is 2 and deluxe is 4
+- hotels have exactly 6 rooms each
+- refunds/cancellations are out of scope
+- adding extra people to rooms that aren't full is out of scope
+- a booking is only for one hotel and for one room therefore a booking also has a maximum of 4 people. If someone wants to book additional rooms, another booking needs to be made
+
 ## Requirements
 
 - Docker with Compose v2
