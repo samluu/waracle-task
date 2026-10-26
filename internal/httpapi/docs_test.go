@@ -20,7 +20,7 @@ func TestDocs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
-			rec := serve(t, mocks.NoStore(), http.MethodGet, tt.path, "")
+			rec := serve(t, &mocks.StoreMock{}, http.MethodGet, tt.path, "")
 			if rec.Code != http.StatusOK {
 				t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 			}
