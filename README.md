@@ -40,6 +40,13 @@ Stop it with `make down`.
 
 Migrations live in [migrations/](migrations) and are run with the [goose](https://github.com/pressly/goose) CLI in a container: `make migrate` applies pending ones to a running database, `make migrate-status` lists what has been applied.
 
+Test data
+```
+make seed    # 2 hotels ("The Grand Hotel", "Seaside Inn"), 6 rooms each, 5 bookings
+make reset   # remove all hotels, rooms and bookings
+```
+Seeding fails if the data is already there, so run `make reset` first to start again. The bookings have fixed references (`SEED-0001` to `SEED-0005`) and are all in January 2027; see [internal/store/seed.go](internal/store/seed.go).
+
 Run tests
 ```
 make test

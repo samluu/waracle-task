@@ -12,7 +12,8 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
+# Builds every command (api, devdata) into /out.
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/ ./cmd/...
 
 # Migration job: `docker compose run migrate <goose command>`, e.g. up, status, down.
 FROM gcr.io/distroless/static-debian13:nonroot AS migrate
@@ -24,7 +25,8 @@ ENTRYPOINT ["/goose"]
 CMD ["up"]
 
 FROM gcr.io/distroless/static-debian13:nonroot AS api
-COPY --from=build /out/api /api
+# devdata ships alongside the API: `docker compose run --rm --entrypoint /devdata api seed|reset`.
+COPY --from=build /out/api /out/devdata /
 EXPOSE 8080
 USER nonroot:nonroot
 ENTRYPOINT ["/api"]
