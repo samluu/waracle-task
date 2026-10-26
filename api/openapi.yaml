@@ -38,7 +38,8 @@ paths:
       description: |
         Fuzzy search: hotels whose name has words similar enough to `name`, ignoring case. Whole or
         partial words and small misspellings match: `grand`, `gran` and `grande` all find
-        "The Grand Hotel". Searches of one or two letters are too short to match. Sorted by name.
+        "The Grand Hotel". A single letter is too short to match, but two can match the start of a
+        word (`gr`). Sorted by name.
 
         Results are paged like `GET /rooms`: repeat the request with `cursor` set to the response's
         `next_cursor` for the next page; the last page has no `next_cursor`.
@@ -93,6 +94,8 @@ paths:
           schema:
             type: string
             format: date
+          # The example stay, 2027-01-11 to 2027-01-13 here and below, is fixed: check_in can't be in the
+          # past, so once it is, Swagger UI's "Try it out" needs the dates changing or these moving forward.
           example: "2027-01-11"
         - name: check_out
           in: query

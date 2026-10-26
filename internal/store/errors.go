@@ -15,9 +15,10 @@ var (
 
 // Postgres SQLSTATE codes the schema's constraints raise.
 const (
-	codeUniqueViolation    = "23505"
-	codeCheckViolation     = "23514"
-	codeExclusionViolation = "23P01"
+	codeForeignKeyViolation = "23503"
+	codeUniqueViolation     = "23505"
+	codeCheckViolation      = "23514"
+	codeExclusionViolation  = "23P01"
 )
 
 // pgConstraintError reports whether err is a Postgres error with the given SQLSTATE code,

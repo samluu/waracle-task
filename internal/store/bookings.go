@@ -29,47 +29,34 @@ const bookingDetailsJoins = `
 	JOIN room_types rt ON rt.type = r.type
 	JOIN hotels h ON h.id = r.hotel_id`
 
-// CreateBooking books a room; the database generates its reference. The capacity check and the insert
-// are one statement, and the bookings_no_overlap constraint rejects double bookings, so concurrent
-// requests can't both succeed. It returns ErrRoomNotFound, ErrOverCapacity or ErrRoomUnavailable when
-// the booking isn't possible.
+// CreateBooking books a room; the database generates its reference. The schema enforces the booking
+// rules, so concurrent requests can't get around them: the room_id foreign key rejects unknown rooms, the
+// bookings_capacity trigger too many guests, and the bookings_no_overlap constraint double bookings. It
+// returns ErrRoomNotFound, ErrOverCapacity or ErrRoomUnavailable when the booking isn't possible.
 func (s *Store) CreateBooking(ctx context.Context, nb NewBooking) (BookingDetails, error) {
 	var b BookingDetails
 	err := s.db.GetContext(ctx, &b, `
 		WITH b AS (
 		  INSERT INTO bookings (room_id, guest_name, guests, check_in, check_out)
-		  SELECT r.id, $2, $3, $4, $5
-		  FROM rooms r JOIN room_types rt ON rt.type = r.type
-		  WHERE r.id = $1 AND rt.capacity >= $3
+		  VALUES ($1, $2, $3, $4, $5)
 		  RETURNING *
 		)
 		SELECT `+bookingDetailsColumns+` FROM b`+bookingDetailsJoins,
 		nb.RoomID, nb.GuestName, nb.Guests, nb.CheckIn, nb.CheckOut)
 
+	if constraint, ok := pgConstraintError(err, codeForeignKeyViolation); ok && constraint == "bookings_room_id_fkey" {
+		return BookingDetails{}, ErrRoomNotFound
+	}
+	if constraint, ok := pgConstraintError(err, codeCheckViolation); ok && constraint == "bookings_capacity" {
+		return BookingDetails{}, ErrOverCapacity
+	}
 	if _, ok := pgConstraintError(err, codeExclusionViolation); ok {
 		return BookingDetails{}, ErrRoomUnavailable
-	}
-	if errors.Is(err, sql.ErrNoRows) {
-		// Nothing inserted: the room doesn't exist or is too small.
-		return BookingDetails{}, s.whyNotBookable(ctx, nb)
 	}
 	if err != nil {
 		return BookingDetails{}, fmt.Errorf("create booking: %w", err)
 	}
 	return b, nil
-}
-
-func (s *Store) whyNotBookable(ctx context.Context, nb NewBooking) error {
-	var capacity int
-	err := s.db.GetContext(ctx, &capacity,
-		`SELECT rt.capacity FROM rooms r JOIN room_types rt ON rt.type = r.type WHERE r.id = $1`, nb.RoomID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return ErrRoomNotFound
-	}
-	if err != nil {
-		return fmt.Errorf("look up room: %w", err)
-	}
-	return ErrOverCapacity
 }
 
 // GetBooking returns the booking with this reference, or ErrNotFound.

@@ -18,8 +18,8 @@ type HotelFilter struct {
 //
 // Matching is pg_trgm word similarity ($1 <% name): a search matches a name when it's similar enough to
 // some run of words in it, ignoring case, so whole or partial words and small misspellings match
-// ("gran", "seasid", "grande"). Searches of one or two letters are too short to match anything. The
-// search is plain text, not a pattern, so it needs no escaping.
+// ("gran", "seasid", "grande"). A single letter is too short to match anything, but two can match the
+// start of a word ("gr"). The search is plain text, not a pattern, so it needs no escaping.
 //
 // Names are unique, so paging is keyset-based on the name alone. The MATERIALIZED CTE finds the matches
 // through hotels_name_trgm_idx first; see roomsInMatchingHotels.

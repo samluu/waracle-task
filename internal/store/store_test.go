@@ -142,6 +142,25 @@ func TestSchemaConstraints(t *testing.T) {
 			}
 		})
 	}
+
+	// The room is a double, so 3 guests is over its capacity, whether booked or changed to afterwards.
+	overCapacity := []struct {
+		name  string
+		query string
+		arg   any
+	}{
+		{"new booking over capacity", `INSERT INTO bookings (room_id, guest_name, guests, check_in, check_out)
+			VALUES ($1, 'Guest', 3, '2030-04-01', '2030-04-02')`, roomID},
+		{"booking changed to over capacity", `UPDATE bookings SET guests = 3 WHERE reference = $1`, firstRef},
+	}
+	for _, tt := range overCapacity {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := s.db.ExecContext(ctx, tt.query, tt.arg)
+			if constraint, ok := pgConstraintError(err, codeCheckViolation); !ok || constraint != "bookings_capacity" {
+				t.Fatalf("want check_violation from bookings_capacity, got %v", err)
+			}
+		})
+	}
 }
 
 func TestRoomTypesSeeded(t *testing.T) {

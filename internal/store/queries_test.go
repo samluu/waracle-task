@@ -43,7 +43,8 @@ func TestFindHotels(t *testing.T) {
 		{"grande", []string{"Grand Seaside Resort", "The Grand Hotel"}}, // a small misspelling
 		{"resort", []string{"Grand Seaside Resort"}},
 		{"lodge", nil},
-		{"e", nil}, // one or two letters are too short to match
+		{"gr", []string{"Grand Seaside Resort", "The Grand Hotel"}}, // two letters can match the start of a word
+		{"e", nil}, // a single letter is too short to match
 		{"%", nil}, // plain text, not a pattern: no wildcards to escape
 		{"_", nil},
 	} {
