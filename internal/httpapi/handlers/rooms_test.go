@@ -84,6 +84,11 @@ func TestFindRooms(t *testing.T) {
 			p.Limit = new(0)
 			return p
 		}(), &mocks.StoreMock{}, FindRooms400JSONResponse{badRequest("limit must be between 1 and 100")}, nil},
+		{"blank hotel name", func() FindRoomsParams {
+			p := validRoomSearch()
+			p.HotelName = new("  ")
+			return p
+		}(), &mocks.StoreMock{}, FindRooms400JSONResponse{badRequest("hotel_name must not be blank; omit it to search every hotel")}, nil},
 		{"invalid cursor", func() FindRoomsParams { // decoding itself is in cursor_test.go
 			p := validRoomSearch()
 			p.Cursor = new("not a cursor")

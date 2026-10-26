@@ -133,6 +133,7 @@ type BadRequest = Error
 
 // FindHotelsParams defines parameters for FindHotels.
 type FindHotelsParams struct {
+	// Name All or part of a hotel's name, in any case.
 	Name string `form:"name" json:"name"`
 }
 
@@ -144,7 +145,8 @@ type FindRoomsParams struct {
 	// Guests Rooms must be able to hold this many guests.
 	Guests int `form:"guests" json:"guests"`
 
-	// HotelName Only search this hotel (exact name). Omit to search every hotel.
+	// HotelName Only search hotels whose name is a fuzzy match for this, as `GET /hotels` matches.
+	// Omit to search every hotel.
 	HotelName *string `form:"hotel_name,omitempty" json:"hotel_name,omitempty"`
 
 	// Limit Rooms per page. Defaults to 20.
@@ -168,7 +170,7 @@ type ServerInterface interface {
 	// GetHealth Service health
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
-	// FindHotels Find a hotel by name
+	// FindHotels Find hotels by name
 	// (GET /hotels)
 	FindHotels(w http.ResponseWriter, r *http.Request, params FindHotelsParams)
 	// FindRooms Find rooms available for a stay
@@ -771,7 +773,7 @@ type StrictServerInterface interface {
 	// GetHealth Service health
 	// (GET /health)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
-	// FindHotels Find a hotel by name
+	// FindHotels Find hotels by name
 	// (GET /hotels)
 	FindHotels(ctx context.Context, request FindHotelsRequestObject) (FindHotelsResponseObject, error)
 	// FindRooms Find rooms available for a stay

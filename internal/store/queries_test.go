@@ -24,25 +24,54 @@ func roomID(t *testing.T, s *Store, hotel, number string) int64 {
 	return id
 }
 
-func TestFindHotelByName(t *testing.T) {
+func TestFindHotels(t *testing.T) {
 	s := seededTestStore(t)
-
-	h, err := s.FindHotelByName(t.Context(), "The Grand Hotel")
-	if err != nil || h.Name != "The Grand Hotel" || h.ID == 0 {
-		t.Fatalf("got %+v, %v", h, err)
+	// A third hotel sharing a word with each seed hotel, so a search can match more than one.
+	if _, err := s.db.ExecContext(t.Context(), `INSERT INTO hotels (name) VALUES ('Grand Seaside Resort')`); err != nil {
+		t.Fatal(err)
 	}
-	for _, name := range []string{"Nope", "the grand hotel", "Grand"} { // exact, case-sensitive match only
-		if _, err := s.FindHotelByName(t.Context(), name); !errors.Is(err, ErrNotFound) {
-			t.Errorf("%q: want ErrNotFound, got %v", name, err)
-		}
+	for _, tt := range []struct {
+		search string
+		want   []string
+	}{
+		{"The Grand Hotel", []string{"The Grand Hotel"}}, // the full name still matches
+		// Any case. Fuzzy: "Grand Seaside Resort" shares most of it too (word similarity 0.67, over 0.6).
+		{"SEASIDE inn", []string{"Grand Seaside Resort", "Seaside Inn"}},
+		{"grand", []string{"Grand Seaside Resort", "The Grand Hotel"}}, // several matches, sorted by name
+		{"gran", []string{"Grand Seaside Resort", "The Grand Hotel"}},  // part of a word
+		{"seasid", []string{"Grand Seaside Resort", "Seaside Inn"}},
+		{"grande", []string{"Grand Seaside Resort", "The Grand Hotel"}}, // a small misspelling
+		{"resort", []string{"Grand Seaside Resort"}},
+		{"lodge", nil},
+		{"e", nil}, // one or two letters are too short to match
+		{"%", nil}, // plain text, not a pattern: no wildcards to escape
+		{"_", nil},
+	} {
+		t.Run(tt.search, func(t *testing.T) {
+			hotels, err := s.FindHotels(t.Context(), tt.search)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []string
+			for _, h := range hotels {
+				if h.ID == 0 {
+					t.Errorf("hotel %+v has no id", h)
+				}
+				got = append(got, h.Name)
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("got %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
 func TestFindRooms(t *testing.T) {
 	s := seededTestStore(t)
 	grand, seaside, nope := "The Grand Hotel", "Seaside Inn", "Nope"
+	partial := "GRAND"
 	search := func(hotel *string, checkIn, checkOut string, guests int) RoomFilter { // one page holds every result
-		return RoomFilter{HotelName: hotel, CheckIn: date(checkIn), CheckOut: date(checkOut), Guests: guests, Limit: 100}
+		return RoomFilter{HotelSearch: hotel, CheckIn: date(checkIn), CheckOut: date(checkOut), Guests: guests, Limit: 100}
 	}
 	allRooms := func(hotel string) []string {
 		return []string{hotel + "/101", hotel + "/102", hotel + "/201", hotel + "/202", hotel + "/301", hotel + "/302"}
@@ -61,6 +90,8 @@ func TestFindRooms(t *testing.T) {
 		{"every hotel, 2 guests", search(nil, "2027-01-11", "2027-01-13", 2),
 			[]string{"Seaside Inn/201", "Seaside Inn/301", "Seaside Inn/302", "The Grand Hotel/202", "The Grand Hotel/302"}},
 		{"one hotel: one of each type free", search(&grand, "2027-01-11", "2027-01-13", 1),
+			[]string{"The Grand Hotel/102", "The Grand Hotel/202", "The Grand Hotel/302"}},
+		{"hotel by part of its name, any case", search(&partial, "2027-01-11", "2027-01-13", 1),
 			[]string{"The Grand Hotel/102", "The Grand Hotel/202", "The Grand Hotel/302"}},
 		{"capacity filters out singles", search(&grand, "2027-01-11", "2027-01-13", 2),
 			[]string{"The Grand Hotel/202", "The Grand Hotel/302"}},
@@ -98,7 +129,7 @@ func TestFindRoomsPages(t *testing.T) {
 	page := func(hotel *string, after *RoomKey, limit int) []string {
 		t.Helper()
 		rooms, err := s.FindRooms(t.Context(), RoomFilter{
-			HotelName: hotel, CheckIn: date("2027-01-11"), CheckOut: date("2027-01-13"), Guests: 1, After: after, Limit: limit,
+			HotelSearch: hotel, CheckIn: date("2027-01-11"), CheckOut: date("2027-01-13"), Guests: 1, After: after, Limit: limit,
 		})
 		if err != nil {
 			t.Fatal(err)

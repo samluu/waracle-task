@@ -16,21 +16,21 @@ func TestFindHotels(t *testing.T) {
 		want    FindHotelsResponseObject
 		wantErr error
 	}{
-		{"found", FindHotelsParams{Name: "The Grand Hotel"},
-			&mocks.StoreMock{FindHotelByNameFunc: func(context.Context, string) (store.Hotel, error) {
-				return store.Hotel{ID: 1, Name: "The Grand Hotel"}, nil
+		{"found", FindHotelsParams{Name: "e"},
+			&mocks.StoreMock{FindHotelsFunc: func(context.Context, string) ([]store.Hotel, error) {
+				return []store.Hotel{{ID: 2, Name: "Seaside Inn"}, {ID: 1, Name: "The Grand Hotel"}}, nil
 			}},
-			FindHotels200JSONResponse{{Id: 1, Name: "The Grand Hotel"}}, nil},
-		{"not found is an empty list", FindHotelsParams{Name: "Nope"},
-			&mocks.StoreMock{FindHotelByNameFunc: func(context.Context, string) (store.Hotel, error) {
-				return store.Hotel{}, store.ErrNotFound
+			FindHotels200JSONResponse{{Id: 2, Name: "Seaside Inn"}, {Id: 1, Name: "The Grand Hotel"}}, nil},
+		{"none is an empty list", FindHotelsParams{Name: "Nope"},
+			&mocks.StoreMock{FindHotelsFunc: func(context.Context, string) ([]store.Hotel, error) {
+				return []store.Hotel{}, nil
 			}},
 			FindHotels200JSONResponse{}, nil},
 		{"blank name", FindHotelsParams{Name: " "}, &mocks.StoreMock{},
 			FindHotels400JSONResponse{badRequest("name is required")}, nil},
 		{"store failure is returned", FindHotelsParams{Name: "X"},
-			&mocks.StoreMock{FindHotelByNameFunc: func(context.Context, string) (store.Hotel, error) {
-				return store.Hotel{}, errStore
+			&mocks.StoreMock{FindHotelsFunc: func(context.Context, string) ([]store.Hotel, error) {
+				return nil, errStore
 			}},
 			nil, errStore},
 	}

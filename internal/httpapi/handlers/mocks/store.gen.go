@@ -19,8 +19,8 @@ import (
 //			CreateBookingFunc: func(ctx context.Context, nb store.NewBooking) (store.BookingDetails, error) {
 //				panic("mock out the CreateBooking method")
 //			},
-//			FindHotelByNameFunc: func(ctx context.Context, name string) (store.Hotel, error) {
-//				panic("mock out the FindHotelByName method")
+//			FindHotelsFunc: func(ctx context.Context, search string) ([]store.Hotel, error) {
+//				panic("mock out the FindHotels method")
 //			},
 //			FindRoomsFunc: func(ctx context.Context, f store.RoomFilter) ([]store.Room, error) {
 //				panic("mock out the FindRooms method")
@@ -41,8 +41,8 @@ type StoreMock struct {
 	// CreateBookingFunc mocks the CreateBooking method.
 	CreateBookingFunc func(ctx context.Context, nb store.NewBooking) (store.BookingDetails, error)
 
-	// FindHotelByNameFunc mocks the FindHotelByName method.
-	FindHotelByNameFunc func(ctx context.Context, name string) (store.Hotel, error)
+	// FindHotelsFunc mocks the FindHotels method.
+	FindHotelsFunc func(ctx context.Context, search string) ([]store.Hotel, error)
 
 	// FindRoomsFunc mocks the FindRooms method.
 	FindRoomsFunc func(ctx context.Context, f store.RoomFilter) ([]store.Room, error)
@@ -62,12 +62,12 @@ type StoreMock struct {
 			// Nb is the nb argument value.
 			Nb store.NewBooking
 		}
-		// FindHotelByName holds details about calls to the FindHotelByName method.
-		FindHotelByName []struct {
+		// FindHotels holds details about calls to the FindHotels method.
+		FindHotels []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// Name is the name argument value.
-			Name string
+			// Search is the search argument value.
+			Search string
 		}
 		// FindRooms holds details about calls to the FindRooms method.
 		FindRooms []struct {
@@ -89,11 +89,11 @@ type StoreMock struct {
 			Ctx context.Context
 		}
 	}
-	lockCreateBooking   sync.RWMutex
-	lockFindHotelByName sync.RWMutex
-	lockFindRooms       sync.RWMutex
-	lockGetBooking      sync.RWMutex
-	lockPing            sync.RWMutex
+	lockCreateBooking sync.RWMutex
+	lockFindHotels    sync.RWMutex
+	lockFindRooms     sync.RWMutex
+	lockGetBooking    sync.RWMutex
+	lockPing          sync.RWMutex
 }
 
 // CreateBooking calls CreateBookingFunc.
@@ -132,39 +132,39 @@ func (mock *StoreMock) CreateBookingCalls() []struct {
 	return calls
 }
 
-// FindHotelByName calls FindHotelByNameFunc.
-func (mock *StoreMock) FindHotelByName(ctx context.Context, name string) (store.Hotel, error) {
-	if mock.FindHotelByNameFunc == nil {
-		panic("StoreMock.FindHotelByNameFunc: method is nil but Store.FindHotelByName was just called")
+// FindHotels calls FindHotelsFunc.
+func (mock *StoreMock) FindHotels(ctx context.Context, search string) ([]store.Hotel, error) {
+	if mock.FindHotelsFunc == nil {
+		panic("StoreMock.FindHotelsFunc: method is nil but Store.FindHotels was just called")
 	}
 	callInfo := struct {
-		Ctx  context.Context
-		Name string
+		Ctx    context.Context
+		Search string
 	}{
-		Ctx:  ctx,
-		Name: name,
+		Ctx:    ctx,
+		Search: search,
 	}
-	mock.lockFindHotelByName.Lock()
-	mock.calls.FindHotelByName = append(mock.calls.FindHotelByName, callInfo)
-	mock.lockFindHotelByName.Unlock()
-	return mock.FindHotelByNameFunc(ctx, name)
+	mock.lockFindHotels.Lock()
+	mock.calls.FindHotels = append(mock.calls.FindHotels, callInfo)
+	mock.lockFindHotels.Unlock()
+	return mock.FindHotelsFunc(ctx, search)
 }
 
-// FindHotelByNameCalls gets all the calls that were made to FindHotelByName.
+// FindHotelsCalls gets all the calls that were made to FindHotels.
 // Check the length with:
 //
-//	len(mockedStore.FindHotelByNameCalls())
-func (mock *StoreMock) FindHotelByNameCalls() []struct {
-	Ctx  context.Context
-	Name string
+//	len(mockedStore.FindHotelsCalls())
+func (mock *StoreMock) FindHotelsCalls() []struct {
+	Ctx    context.Context
+	Search string
 } {
 	var calls []struct {
-		Ctx  context.Context
-		Name string
+		Ctx    context.Context
+		Search string
 	}
-	mock.lockFindHotelByName.RLock()
-	calls = mock.calls.FindHotelByName
-	mock.lockFindHotelByName.RUnlock()
+	mock.lockFindHotels.RLock()
+	calls = mock.calls.FindHotels
+	mock.lockFindHotels.RUnlock()
 	return calls
 }
 

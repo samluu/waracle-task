@@ -19,7 +19,7 @@ import (
 // Store is the data access the handlers depend on; *store.Store implements it.
 type Store interface {
 	Ping(ctx context.Context) error
-	FindHotelByName(ctx context.Context, name string) (store.Hotel, error)
+	FindHotels(ctx context.Context, search string) ([]store.Hotel, error)
 	FindRooms(ctx context.Context, f store.RoomFilter) ([]store.Room, error)
 	CreateBooking(ctx context.Context, nb store.NewBooking) (store.BookingDetails, error)
 	GetBooking(ctx context.Context, reference uuid.UUID) (store.BookingDetails, error)

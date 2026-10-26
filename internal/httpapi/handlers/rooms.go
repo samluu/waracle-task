@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/samluu/waracle-task/internal/store"
 )
@@ -28,6 +29,14 @@ func (s *Server) FindRooms(ctx context.Context, req FindRoomsRequestObject) (Fin
 	if limit < 1 || limit > maxRoomPageSize {
 		return FindRooms400JSONResponse{badRequest(fmt.Sprintf("limit must be between 1 and %d", maxRoomPageSize))}, nil
 	}
+	var hotelSearch *string
+	if params.HotelName != nil {
+		search := strings.TrimSpace(*params.HotelName)
+		if search == "" {
+			return FindRooms400JSONResponse{badRequest("hotel_name must not be blank; omit it to search every hotel")}, nil
+		}
+		hotelSearch = &search
+	}
 	var after *store.RoomKey
 	if params.Cursor != nil {
 		key, err := decodeCursor(*params.Cursor)
@@ -39,12 +48,12 @@ func (s *Server) FindRooms(ctx context.Context, req FindRoomsRequestObject) (Fin
 
 	// Ask for one more room than the page holds: if it comes back, there's a next page.
 	rooms, err := s.store.FindRooms(ctx, store.RoomFilter{
-		HotelName: params.HotelName,
-		CheckIn:   params.CheckIn.Time,
-		CheckOut:  params.CheckOut.Time,
-		Guests:    params.Guests,
-		After:     after,
-		Limit:     limit + 1,
+		HotelSearch: hotelSearch,
+		CheckIn:     params.CheckIn.Time,
+		CheckOut:    params.CheckOut.Time,
+		Guests:      params.Guests,
+		After:       after,
+		Limit:       limit + 1,
 	})
 	if err != nil {
 		return nil, err

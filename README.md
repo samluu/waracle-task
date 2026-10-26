@@ -16,7 +16,7 @@
 - check in date is inclusive and check out date is exclusive, they'll be the same if the stay is 1 night
 - a booking records the lead guest's name and the number of guests, we don't need to store all the guests
 - when searching for a room, the filters are an optional hotel name, number of guests and a date range. The search is applied to all matching hotels and rooms
-- when searching for a hotel by name, it has to be an exact match
+- searching by hotel name is fuzzy and uses Postgres trigram word similarity
 - hotel names are unique
 - seeding gives some fixed data that can be reset. Not generating random data as that's more useful for load testing whilst the fixed data is better for manual tests
 - when booking check in has to be between today and a year from now. I believe hotels usually have a limit to how far in advanced you can book.
@@ -60,14 +60,14 @@ make test
 
 | Method | Path | Does |
 |---|---|---|
-| GET | `/hotels?name=` | Find a hotel by its exact name |
-| GET | `/rooms?check_in=&check_out=&guests=[&hotel_name=][&limit=][&cursor=]` | Rooms free for the whole stay that can hold the guests, in every hotel or just the one named. Paged: up to `limit` rooms (default 20, max 100) per page; pass the response's `next_cursor` as `cursor` for the next page |
+| GET | `/hotels?name=` | Hotels whose name is a fuzzy match for `name` (ignoring case, whole or partial words, small misspellings), sorted by name |
+| GET | `/rooms?check_in=&check_out=&guests=[&hotel_name=][&limit=][&cursor=]` | Rooms free for the whole stay that can hold the guests, in every hotel or only those whose name is a fuzzy match for `hotel_name`, as `/hotels` matches. Paged: up to `limit` rooms (default 20, max 100) per page; pass the response's `next_cursor` as `cursor` for the next page |
 | POST | `/bookings` | Book a room (`room_id` comes from `GET /rooms`) |
 | GET | `/bookings/{reference}` | Booking details |
 
 For example, after `make seed`:
 ```
-curl 'localhost:8080/rooms?check_in=2027-01-11&check_out=2027-01-13&guests=1&hotel_name=The%20Grand%20Hotel'
+curl 'localhost:8080/rooms?check_in=2027-01-11&check_out=2027-01-13&guests=1&hotel_name=grand'
 curl -X POST localhost:8080/bookings -d '{"room_id":2,"guest_name":"Jane Doe","guests":1,"check_in":"2027-01-11","check_out":"2027-01-13"}'
 curl localhost:8080/bookings/5eed0000-0000-4000-8000-000000000001
 ```

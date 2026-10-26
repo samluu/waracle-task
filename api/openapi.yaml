@@ -34,15 +34,19 @@ paths:
   /hotels:
     get:
       operationId: findHotels
-      summary: Find a hotel by name
-      description: Exact, case-sensitive match. Hotel names are unique, so this returns zero or one hotel.
+      summary: Find hotels by name
+      description: |
+        Fuzzy search: hotels whose name has words similar enough to `name`, ignoring case. Whole or
+        partial words and small misspellings match: `grand`, `gran` and `grande` all find
+        "The Grand Hotel". Searches of one or two letters are too short to match. Sorted by name.
       parameters:
         - name: name
           in: query
           required: true
+          description: All or part of a hotel's name, in any case.
           schema:
             type: string
-          example: The Grand Hotel
+          example: grand
       responses:
         "200":
           description: Matching hotels.
@@ -91,10 +95,12 @@ paths:
         - name: hotel_name
           in: query
           required: false
-          description: Only search this hotel (exact name). Omit to search every hotel.
+          description: |
+            Only search hotels whose name is a fuzzy match for this, as `GET /hotels` matches.
+            Omit to search every hotel.
           schema:
             type: string
-          example: The Grand Hotel
+          example: grand
         - name: limit
           in: query
           required: false
