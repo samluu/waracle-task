@@ -12,8 +12,15 @@ import (
 	"time"
 
 	"github.com/samluu/waracle-task/internal/config"
+	"github.com/samluu/waracle-task/internal/email"
 	"github.com/samluu/waracle-task/internal/httpapi"
 	"github.com/samluu/waracle-task/internal/store"
+)
+
+const (
+	emailDelay     = 2 * time.Second // the brief's simulated time to send one email
+	emailQueueSize = 100             // confirmations waiting to send before new ones are dropped
+	emailWorkers   = 4               // emails sent at once
 )
 
 func main() {
@@ -41,9 +48,13 @@ func run() error {
 	}
 	defer st.Close()
 
+	// Booking confirmations are sent in the background. The LogSender stands in for a mail provider: it
+	// takes emailDelay to "send" each one, then logs it.
+	emails := email.NewQueue(email.LogSender{Delay: emailDelay, Logger: slog.Default()}, slog.Default(), emailQueueSize, emailWorkers)
+
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           httpapi.NewRouter(st),
+		Handler:           httpapi.NewRouter(st, emails),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,
@@ -67,6 +78,11 @@ func run() error {
 		defer cancel()
 		if err := srv.Shutdown(shutdownCtx); err != nil {
 			slog.Error("shutdown", "err", err)
+		}
+		// Requests have finished, so no more emails can be queued: send the ones waiting, within what's
+		// left of the shutdown time. Any still unsent are logged by the queue.
+		if err := emails.Close(shutdownCtx); err != nil {
+			slog.Error("confirmation emails left unsent at shutdown", "err", err)
 		}
 		close(shutdownDone)
 	}()

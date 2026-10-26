@@ -12,7 +12,9 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/samluu/waracle-task/internal/email"
 	"github.com/samluu/waracle-task/internal/httpapi/handlers"
+	"github.com/samluu/waracle-task/internal/httpapi/handlers/mocks"
 	"github.com/samluu/waracle-task/internal/store"
 )
 
@@ -28,7 +30,9 @@ func serve(t *testing.T, st handlers.Store, method, target, body string) *httpte
 		r = strings.NewReader(body)
 	}
 	rec := httptest.NewRecorder()
-	srv := handlers.NewServer(st, func() time.Time { return testToday })
+	// Accept every confirmation email: what's sent is tested in the handler and email packages.
+	emails := &mocks.EmailQueueMock{EnqueueFunc: func(email.Confirmation) bool { return true }}
+	srv := handlers.NewServer(st, emails, func() time.Time { return testToday })
 	newRouter(srv).ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), method, target, r))
 	return rec
 }

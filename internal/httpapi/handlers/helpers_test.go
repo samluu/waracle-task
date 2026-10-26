@@ -9,18 +9,25 @@ import (
 	"github.com/google/uuid"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
+	"github.com/samluu/waracle-task/internal/httpapi/handlers/mocks"
 	"github.com/samluu/waracle-task/internal/store"
 )
 
-// The store is mocked with mocks.StoreMock; see the mocks package.
+// The store and email queue are mocked with mocks.StoreMock and mocks.EmailQueueMock; see the mocks package.
 
 // testToday is the fixed "today" for handler tests.
 var testToday = time.Date(2026, 10, 26, 15, 0, 0, 0, time.UTC)
 
 // newTestServer returns the handlers backed by st, with "today" fixed to testToday. Handler tests call
-// its methods directly with a request struct and compare the response struct.
+// its methods directly with a request struct and compare the response struct. Its email queue has no
+// methods set, so a handler that queues an email panics; tests of booking use newBookingServer.
 func newTestServer(st Store) *Server {
-	return NewServer(st, func() time.Time { return testToday })
+	return newBookingServer(st, &mocks.EmailQueueMock{})
+}
+
+// newBookingServer is newTestServer with emails as its email queue.
+func newBookingServer(st Store, emails EmailQueue) *Server {
+	return NewServer(st, emails, func() time.Time { return testToday })
 }
 
 // assertResponse fails unless a handler returned wantErr (matched with errors.Is), or no error and a

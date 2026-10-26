@@ -3,9 +3,11 @@ package handlers
 import (
 	"context"
 	"errors"
+	"log/slog"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
+	"github.com/samluu/waracle-task/internal/email"
 	"github.com/samluu/waracle-task/internal/store"
 )
 
@@ -28,7 +30,18 @@ func (s *Server) CreateBooking(ctx context.Context, req CreateBookingRequestObje
 		return nil, err
 	}
 
-	// The booking is committed: this is where the confirmation email will be triggered.
+	// The booking is committed, so confirm it. Sending happens in the background: the response doesn't
+	// wait for it, and a confirmation that can't be queued doesn't undo the booking.
+	if !s.emails.Enqueue(email.Confirmation{
+		Reference:  booking.Reference,
+		GuestName:  booking.GuestName,
+		HotelName:  booking.Room.HotelName,
+		RoomNumber: booking.Room.Number,
+		CheckIn:    booking.CheckIn,
+		CheckOut:   booking.CheckOut,
+	}) {
+		slog.Error("confirmation email not queued", "reference", booking.Reference)
+	}
 
 	location := "/bookings/" + booking.Reference.String()
 	return CreateBooking201JSONResponse{

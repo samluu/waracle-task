@@ -5,6 +5,7 @@ package handlers
 
 //go:generate go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.1 -config oapi-codegen.yaml ../../../api/openapi.yaml
 //go:generate go tool moq -pkg mocks -skip-ensure -out mocks/store.gen.go . Store
+//go:generate go tool moq -pkg mocks -skip-ensure -out mocks/email_queue.gen.go . EmailQueue
 
 import (
 	"context"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/samluu/waracle-task/internal/email"
 	"github.com/samluu/waracle-task/internal/store"
 )
 
@@ -25,20 +27,27 @@ type Store interface {
 	GetBooking(ctx context.Context, reference uuid.UUID) (store.BookingDetails, error)
 }
 
+// EmailQueue takes confirmation emails to send in the background; *email.Queue implements it. Enqueue
+// must not block: it reports false if it can't take the email.
+type EmailQueue interface {
+	Enqueue(c email.Confirmation) bool
+}
+
 // Server implements the strict handlers generated from api/openapi.yaml: each takes a decoded request
 // and returns a typed response, and the generated code does the HTTP decoding and encoding.
 type Server struct {
-	store Store
-	now   func() time.Time
+	store  Store
+	emails EmailQueue
+	now    func() time.Time
 }
 
 // Fails to compile if Server is missing a handler for an operation in the spec.
 var _ StrictServerInterface = (*Server)(nil)
 
-// NewServer returns handlers backed by st. now gives the current time for date validation; it's a
-// parameter so tests can fix "today" (production passes time.Now).
-func NewServer(st Store, now func() time.Time) *Server {
-	return &Server{store: st, now: now}
+// NewServer returns handlers backed by st, sending booking confirmations through emails. now gives the
+// current time for date validation; it's a parameter so tests can fix "today" (production passes time.Now).
+func NewServer(st Store, emails EmailQueue, now func() time.Time) *Server {
+	return &Server{store: st, emails: emails, now: now}
 }
 
 func (s *Server) GetHealth(ctx context.Context, _ GetHealthRequestObject) (GetHealthResponseObject, error) {

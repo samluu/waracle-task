@@ -21,6 +21,9 @@
 - seeding gives some fixed data that can be reset. Not generating random data as that's more useful for load testing whilst the fixed data is better for manual tests
 - when booking check in has to be between today and a year from now. I believe hotels usually have a limit to how far in advanced you can book.
 - when booking, a stay can be at most 30 nights. There are probably local laws restricting how long you can stay in a hotel in one go
+- the 2 second delay mentioned in the spec is assumed to simulate a email send delay
+- not adding email address for the simulated log email
+- if the email buffer is full, an error is logged. There isn't any saga
 
 ## Requirements
 

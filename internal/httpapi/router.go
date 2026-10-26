@@ -9,8 +9,8 @@ import (
 	"github.com/samluu/waracle-task/internal/httpapi/handlers"
 )
 
-func NewRouter(s handlers.Store) http.Handler {
-	return newRouter(handlers.NewServer(s, time.Now))
+func NewRouter(s handlers.Store, emails handlers.EmailQueue) http.Handler {
+	return newRouter(handlers.NewServer(s, emails, time.Now))
 }
 
 func newRouter(srv *handlers.Server) http.Handler {
