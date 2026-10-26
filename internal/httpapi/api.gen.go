@@ -6,13 +6,82 @@
 package httpapi
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"time"
+
+	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Defines values for RoomType.
+const (
+	Deluxe RoomType = "deluxe"
+	Double RoomType = "double"
+	Single RoomType = "single"
+)
+
+// Valid indicates whether the value is a known member of the RoomType enum.
+func (e RoomType) Valid() bool {
+	switch e {
+	case Deluxe:
+		return true
+	case Double:
+		return true
+	case Single:
+		return true
+	default:
+		return false
+	}
+}
+
+// Booking defines model for Booking.
+type Booking struct {
+	// CheckIn Example: 2027-01-11
+	CheckIn openapi_types.Date `json:"check_in"`
+
+	// CheckOut Example: 2027-01-13
+	CheckOut  openapi_types.Date `json:"check_out"`
+	CreatedAt time.Time          `json:"created_at"`
+
+	// GuestName Example: Jane Doe
+	GuestName string `json:"guest_name"`
+
+	// Guests Example: 1
+	Guests int `json:"guests"`
+
+	// Reference Example: 3f2b8c1e-9a4d-4c6e-b1f0-7d2e5a9c4b13
+	Reference openapi_types.UUID `json:"reference"`
+	Room      Room               `json:"room"`
+}
+
+// BookingRequest defines model for BookingRequest.
+type BookingRequest struct {
+	// CheckIn Example: 2027-01-11
+	CheckIn openapi_types.Date `json:"check_in"`
+
+	// CheckOut Example: 2027-01-13
+	CheckOut openapi_types.Date `json:"check_out"`
+
+	// GuestName The lead guest's name.
+	//
+	// Example: Jane Doe
+	GuestName string `json:"guest_name"`
+
+	// Guests Example: 1
+	Guests int `json:"guests"`
+
+	// RoomId Example: 2
+	RoomId int64 `json:"room_id"`
+}
 
 // Error defines model for Error.
 type Error struct {
-	// Error Example: database unavailable
+	// Error Example: check_out must be after check_in
 	Error string `json:"error"`
 }
 
@@ -22,11 +91,76 @@ type HealthResponse struct {
 	Status string `json:"status"`
 }
 
+// Hotel defines model for Hotel.
+type Hotel struct {
+	// Id Example: 1
+	Id int64 `json:"id"`
+
+	// Name Example: The Grand Hotel
+	Name string `json:"name"`
+}
+
+// Room defines model for Room.
+type Room struct {
+	// Capacity Maximum number of guests.
+	//
+	// Example: 1
+	Capacity int   `json:"capacity"`
+	Hotel    Hotel `json:"hotel"`
+
+	// Id Use this as room_id when booking.
+	//
+	// Example: 2
+	Id int64 `json:"id"`
+
+	// Number Example: 102
+	Number string   `json:"number"`
+	Type   RoomType `json:"type"`
+}
+
+// RoomType defines model for RoomType.
+type RoomType string
+
+// BadRequest defines model for BadRequest.
+type BadRequest = Error
+
+// FindHotelsParams defines parameters for FindHotels.
+type FindHotelsParams struct {
+	Name string `form:"name" json:"name"`
+}
+
+// FindRoomsParams defines parameters for FindRooms.
+type FindRoomsParams struct {
+	CheckIn  openapi_types.Date `form:"check_in" json:"check_in"`
+	CheckOut openapi_types.Date `form:"check_out" json:"check_out"`
+
+	// Guests Rooms must be able to hold this many guests.
+	Guests int `form:"guests" json:"guests"`
+
+	// HotelName Only search this hotel (exact name). Omit to search every hotel.
+	HotelName *string `form:"hotel_name,omitempty" json:"hotel_name,omitempty"`
+}
+
+// CreateBookingJSONRequestBody defines body for CreateBooking for application/json ContentType.
+type CreateBookingJSONRequestBody = BookingRequest
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// CreateBooking Book a room
+	// (POST /bookings)
+	CreateBooking(w http.ResponseWriter, r *http.Request)
+	// GetBooking Find a booking by reference
+	// (GET /bookings/{reference})
+	GetBooking(w http.ResponseWriter, r *http.Request, reference openapi_types.UUID)
 	// GetHealth Service health
 	// (GET /health)
 	GetHealth(w http.ResponseWriter, r *http.Request)
+	// FindHotels Find a hotel by name
+	// (GET /hotels)
+	FindHotels(w http.ResponseWriter, r *http.Request, params FindHotelsParams)
+	// FindRooms Find rooms available for a stay
+	// (GET /rooms)
+	FindRooms(w http.ResponseWriter, r *http.Request, params FindRoomsParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -38,11 +172,156 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
+// CreateBooking operation middleware
+func (siw *ServerInterfaceWrapper) CreateBooking(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateBooking(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetBooking operation middleware
+func (siw *ServerInterfaceWrapper) GetBooking(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "reference" -------------
+	var reference openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "reference", r.PathValue("reference"), &reference, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "reference", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetBooking(w, r, reference)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetHealth operation middleware
 func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetHealth(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// FindHotels operation middleware
+func (siw *ServerInterfaceWrapper) FindHotels(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params FindHotelsParams
+
+	// ------------- Required query parameter "name" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "name", r.URL.Query(), &params.Name, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "name"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.FindHotels(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// FindRooms operation middleware
+func (siw *ServerInterfaceWrapper) FindRooms(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params FindRoomsParams
+
+	// ------------- Required query parameter "check_in" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "check_in", r.URL.Query(), &params.CheckIn, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "check_in"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "check_in", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "check_out" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "check_out", r.URL.Query(), &params.CheckOut, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "check_out"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "check_out", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "guests" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "guests", r.URL.Query(), &params.Guests, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "guests"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "guests", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "hotel_name" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "hotel_name", r.URL.Query(), &params.HotelName, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "hotel_name"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "hotel_name", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.FindRooms(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -173,6 +452,462 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	}
 
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/health", wrapper.GetHealth)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/hotels", wrapper.FindHotels)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/rooms", wrapper.FindRooms)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/bookings", wrapper.CreateBooking)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/bookings/{reference}", wrapper.GetBooking)
 
 	return m
+}
+
+type BadRequestJSONResponse Error
+
+type CreateBookingRequestObject struct {
+	Body *CreateBookingJSONRequestBody
+}
+
+type CreateBookingResponseObject interface {
+	VisitCreateBookingResponse(w http.ResponseWriter) error
+}
+
+type CreateBooking201ResponseHeaders struct {
+	Location *string
+}
+
+type CreateBooking201JSONResponse struct {
+	Body    Booking
+	Headers CreateBooking201ResponseHeaders
+}
+
+func (response CreateBooking201JSONResponse) VisitCreateBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.Location != nil {
+		w.Header().Set("Location", fmt.Sprint(*response.Headers.Location))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBooking400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateBooking400JSONResponse) VisitCreateBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBooking404JSONResponse Error
+
+func (response CreateBooking404JSONResponse) VisitCreateBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBooking409JSONResponse Error
+
+func (response CreateBooking409JSONResponse) VisitCreateBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBooking413JSONResponse Error
+
+func (response CreateBooking413JSONResponse) VisitCreateBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(413)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateBooking422JSONResponse Error
+
+func (response CreateBooking422JSONResponse) VisitCreateBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetBookingRequestObject struct {
+	Reference openapi_types.UUID `json:"reference"`
+}
+
+type GetBookingResponseObject interface {
+	VisitGetBookingResponse(w http.ResponseWriter) error
+}
+
+type GetBooking200JSONResponse Booking
+
+func (response GetBooking200JSONResponse) VisitGetBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetBooking400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response GetBooking400JSONResponse) VisitGetBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetBooking404JSONResponse Error
+
+func (response GetBooking404JSONResponse) VisitGetBookingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetHealthRequestObject struct {
+}
+
+type GetHealthResponseObject interface {
+	VisitGetHealthResponse(w http.ResponseWriter) error
+}
+
+type GetHealth200JSONResponse HealthResponse
+
+func (response GetHealth200JSONResponse) VisitGetHealthResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetHealth503JSONResponse Error
+
+func (response GetHealth503JSONResponse) VisitGetHealthResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FindHotelsRequestObject struct {
+	Params FindHotelsParams
+}
+
+type FindHotelsResponseObject interface {
+	VisitFindHotelsResponse(w http.ResponseWriter) error
+}
+
+type FindHotels200JSONResponse []Hotel
+
+func (response FindHotels200JSONResponse) VisitFindHotelsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FindHotels400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response FindHotels400JSONResponse) VisitFindHotelsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FindRoomsRequestObject struct {
+	Params FindRoomsParams
+}
+
+type FindRoomsResponseObject interface {
+	VisitFindRoomsResponse(w http.ResponseWriter) error
+}
+
+type FindRooms200JSONResponse []Room
+
+func (response FindRooms200JSONResponse) VisitFindRoomsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FindRooms400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response FindRooms400JSONResponse) VisitFindRoomsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+// StrictServerInterface represents all server handlers.
+type StrictServerInterface interface {
+	// CreateBooking Book a room
+	// (POST /bookings)
+	CreateBooking(ctx context.Context, request CreateBookingRequestObject) (CreateBookingResponseObject, error)
+	// GetBooking Find a booking by reference
+	// (GET /bookings/{reference})
+	GetBooking(ctx context.Context, request GetBookingRequestObject) (GetBookingResponseObject, error)
+	// GetHealth Service health
+	// (GET /health)
+	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
+	// FindHotels Find a hotel by name
+	// (GET /hotels)
+	FindHotels(ctx context.Context, request FindHotelsRequestObject) (FindHotelsResponseObject, error)
+	// FindRooms Find rooms available for a stay
+	// (GET /rooms)
+	FindRooms(ctx context.Context, request FindRoomsRequestObject) (FindRoomsResponseObject, error)
+}
+
+type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
+type StrictMiddlewareFunc func(f StrictHandlerFunc, operationID string) StrictHandlerFunc
+
+type StrictHTTPServerOptions struct {
+	RequestErrorHandlerFunc  func(w http.ResponseWriter, r *http.Request, err error)
+	ResponseErrorHandlerFunc func(w http.ResponseWriter, r *http.Request, err error)
+}
+
+func NewStrictHandler(ssi StrictServerInterface, middlewares []StrictMiddlewareFunc) ServerInterface {
+	return &strictHandler{ssi: ssi, middlewares: middlewares, options: StrictHTTPServerOptions{
+		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		},
+		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		},
+	}}
+}
+
+func NewStrictHandlerWithOptions(ssi StrictServerInterface, middlewares []StrictMiddlewareFunc, options StrictHTTPServerOptions) ServerInterface {
+	if options.RequestErrorHandlerFunc == nil {
+		options.RequestErrorHandlerFunc = func(w http.ResponseWriter, r *http.Request, err error) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+		}
+	}
+	if options.ResponseErrorHandlerFunc == nil {
+		options.ResponseErrorHandlerFunc = func(w http.ResponseWriter, r *http.Request, err error) {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
+	return &strictHandler{ssi: ssi, middlewares: middlewares, options: options}
+}
+
+type strictHandler struct {
+	ssi         StrictServerInterface
+	middlewares []StrictMiddlewareFunc
+	options     StrictHTTPServerOptions
+}
+
+// CreateBooking operation middleware
+func (sh *strictHandler) CreateBooking(w http.ResponseWriter, r *http.Request) {
+	var request CreateBookingRequestObject
+
+	var body CreateBookingJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateBooking(ctx, request.(CreateBookingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateBooking")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateBookingResponseObject); ok {
+		if err := validResponse.VisitCreateBookingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetBooking operation middleware
+func (sh *strictHandler) GetBooking(w http.ResponseWriter, r *http.Request, reference openapi_types.UUID) {
+	var request GetBookingRequestObject
+
+	request.Reference = reference
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetBooking(ctx, request.(GetBookingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetBooking")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetBookingResponseObject); ok {
+		if err := validResponse.VisitGetBookingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetHealth operation middleware
+func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
+	var request GetHealthRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetHealth(ctx, request.(GetHealthRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetHealth")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetHealthResponseObject); ok {
+		if err := validResponse.VisitGetHealthResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// FindHotels operation middleware
+func (sh *strictHandler) FindHotels(w http.ResponseWriter, r *http.Request, params FindHotelsParams) {
+	var request FindHotelsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.FindHotels(ctx, request.(FindHotelsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "FindHotels")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(FindHotelsResponseObject); ok {
+		if err := validResponse.VisitFindHotelsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// FindRooms operation middleware
+func (sh *strictHandler) FindRooms(w http.ResponseWriter, r *http.Request, params FindRoomsParams) {
+	var request FindRoomsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.FindRooms(ctx, request.(FindRoomsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "FindRooms")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(FindRoomsResponseObject); ok {
+		if err := validResponse.VisitFindRoomsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }

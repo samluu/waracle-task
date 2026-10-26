@@ -2,7 +2,12 @@ openapi: 3.0.3
 info:
   title: Hotel Booking API
   version: 0.1.0
-  description: Hotel room booking API for the Waracle Backend Developer Challenge.
+  description: |
+    Hotel room booking API for the Waracle Backend Developer Challenge.
+
+    Dates are `YYYY-MM-DD`. A stay covers the nights from `check_in` up to, but not including,
+    `check_out`, so a one-night stay checks out the day after it checks in. `check_in` can't be in
+    the past or more than a year from today (UTC), and a stay can be at most 30 nights.
 servers:
   - url: http://localhost:8080
 
@@ -26,7 +31,167 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
+  /hotels:
+    get:
+      operationId: findHotels
+      summary: Find a hotel by name
+      description: Exact, case-sensitive match. Hotel names are unique, so this returns zero or one hotel.
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+          example: The Grand Hotel
+      responses:
+        "200":
+          description: Matching hotels.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Hotel"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /rooms:
+    get:
+      operationId: findRooms
+      summary: Find rooms available for a stay
+      description: |
+        Rooms that are free for every night of the stay and can hold the given number of guests,
+        across all hotels or just the one named. Sorted by hotel name, then room number.
+      parameters:
+        - name: check_in
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2027-01-11"
+        - name: check_out
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+          example: "2027-01-13"
+        - name: guests
+          in: query
+          required: true
+          description: Rooms must be able to hold this many guests.
+          schema:
+            type: integer
+            minimum: 1
+          example: 1
+        - name: hotel_name
+          in: query
+          required: false
+          description: Only search this hotel (exact name). Omit to search every hotel.
+          schema:
+            type: string
+          example: The Grand Hotel
+      responses:
+        "200":
+          description: Available rooms.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Room"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /bookings:
+    post:
+      operationId: createBooking
+      summary: Book a room
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingRequest"
+      responses:
+        "201":
+          description: Booked.
+          headers:
+            Location:
+              description: URL of the new booking.
+              schema:
+                type: string
+              example: /bookings/3f2b8c1e-9a4d-4c6e-b1f0-7d2e5a9c4b13
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          description: The room doesn't exist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: The room is already booked for at least one night of the stay.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: The request body is larger than 64 KiB.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: More guests than the room's capacity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /bookings/{reference}:
+    get:
+      operationId: getBooking
+      summary: Find a booking by reference
+      parameters:
+        - name: reference
+          in: path
+          required: true
+          description: The booking reference, a UUID. Anything that isn't a UUID is rejected with a 400.
+          schema:
+            type: string
+            format: uuid
+          example: 5eed0000-0000-4000-8000-000000000001
+      responses:
+        "200":
+          description: The booking.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Booking"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          description: No booking with that reference.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
 components:
+  responses:
+    BadRequest:
+      description: The request is invalid, e.g. a missing parameter or a check-out before check-in.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
   schemas:
     HealthResponse:
       type: object
@@ -35,10 +200,101 @@ components:
         status:
           type: string
           example: ok
+
     Error:
       type: object
       required: [error]
       properties:
         error:
           type: string
-          example: database unavailable
+          example: check_out must be after check_in
+
+    Hotel:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        name:
+          type: string
+          example: The Grand Hotel
+
+    RoomType:
+      type: string
+      enum: [single, double, deluxe]
+
+    Room:
+      type: object
+      required: [id, number, type, capacity, hotel]
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Use this as room_id when booking.
+          example: 2
+        number:
+          type: string
+          example: "102"
+        type:
+          $ref: "#/components/schemas/RoomType"
+        capacity:
+          type: integer
+          description: Maximum number of guests.
+          example: 1
+        hotel:
+          $ref: "#/components/schemas/Hotel"
+
+    BookingRequest:
+      type: object
+      required: [room_id, guest_name, guests, check_in, check_out]
+      properties:
+        room_id:
+          type: integer
+          format: int64
+          example: 2
+        guest_name:
+          type: string
+          description: The lead guest's name.
+          example: Jane Doe
+        guests:
+          type: integer
+          minimum: 1
+          example: 1
+        check_in:
+          type: string
+          format: date
+          example: "2027-01-11"
+        check_out:
+          type: string
+          format: date
+          example: "2027-01-13"
+
+    Booking:
+      type: object
+      required: [reference, guest_name, guests, check_in, check_out, created_at, room]
+      properties:
+        reference:
+          type: string
+          format: uuid
+          example: 3f2b8c1e-9a4d-4c6e-b1f0-7d2e5a9c4b13
+        guest_name:
+          type: string
+          example: Jane Doe
+        guests:
+          type: integer
+          example: 1
+        check_in:
+          type: string
+          format: date
+          example: "2027-01-11"
+        check_out:
+          type: string
+          format: date
+          example: "2027-01-13"
+        created_at:
+          type: string
+          format: date-time
+        room:
+          $ref: "#/components/schemas/Room"

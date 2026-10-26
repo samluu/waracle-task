@@ -19,6 +19,8 @@
 - when searching for a hotel by name, it has to be an exact match
 - hotel names are unique
 - seeding gives some fixed data that can be reset. Not generating random data as that's more useful for load testing whilst the fixed data is better for manual tests
+- when booking check in has to be between today and a year from now. I believe hotels usually have a limit to how far in advanced you can book.
+- when booking, a stay can be at most 30 nights. There are probably local laws restricting how long you can stay in a hotel in one go
 
 ## Requirements
 
@@ -46,15 +48,30 @@ Test data
 make seed    # 2 hotels ("The Grand Hotel", "Seaside Inn"), 6 rooms each, 5 bookings
 make reset   # remove all hotels, rooms and bookings
 ```
-Seeding fails if the data is already there, so run `make reset` first to start again. The bookings have fixed references (`SEED-0001` to `SEED-0005`) and are all in January 2027; see [internal/store/seed.go](internal/store/seed.go).
+Seeding fails if the data is already there, so run `make reset` first to start again. The bookings have fixed references, UUIDs `5eed0000-0000-4000-8000-000000000001` to `...005`, and are all in January 2027; see [internal/store/seed.go](internal/store/seed.go).
 
 Run tests
 ```
 make test
 ```
-`make test-integration` also runs the database tests against the compose Postgres (it runs `make migrate` first). Run the linter with `make lint`.
+`make test-integration` also runs the database tests, against a separate `hotel_test` database in the compose Postgres that it creates and migrates, so your dev data is untouched. Run the linter with `make lint`.
 
 ## API
+
+| Method | Path | Does |
+|---|---|---|
+| GET | `/hotels?name=` | Find a hotel by its exact name |
+| GET | `/rooms?check_in=&check_out=&guests=[&hotel_name=]` | Rooms free for the whole stay that can hold the guests, in every hotel or just the one named |
+| POST | `/bookings` | Book a room (`room_id` comes from `GET /rooms`) |
+| GET | `/bookings/{reference}` | Booking details |
+
+For example, after `make seed`:
+```
+curl 'localhost:8080/rooms?check_in=2027-01-11&check_out=2027-01-13&guests=1&hotel_name=The%20Grand%20Hotel'
+curl -X POST localhost:8080/bookings -d '{"room_id":2,"guest_name":"Jane Doe","guests":1,"check_in":"2027-01-11","check_out":"2027-01-13"}'
+curl localhost:8080/bookings/5eed0000-0000-4000-8000-000000000001
+```
+A booking that clashes with another is 409, too many guests for the room is 422, and invalid input is 400; errors are `{"error": "..."}`.
 
 The API is defined in [api/openapi.yaml](api/openapi.yaml). With the server running:
 

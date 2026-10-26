@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -43,14 +42,14 @@ var seedHotels = []seedHotel{
 	{name: "Seaside Inn", rooms: seedRooms},
 }
 
-// Fixed references and dates so testers know what to search for. Over 11-13 Jan 2027 at The Grand Hotel,
+// Fixed references (recognisable "5eed..." UUIDs) and dates so testers know what to search for. Over 11-13 Jan 2027 at The Grand Hotel,
 // one room of each type is booked and the other is free.
 var seedBookings = []seedBooking{
-	{"SEED-0001", "The Grand Hotel", "101", "Alice Smith", 1, "2027-01-11", "2027-01-13"},
-	{"SEED-0002", "The Grand Hotel", "201", "Bob Jones", 2, "2027-01-10", "2027-01-14"},
-	{"SEED-0003", "The Grand Hotel", "301", "Carol White", 4, "2027-01-12", "2027-01-15"},
-	{"SEED-0004", "The Grand Hotel", "201", "Dan Brown", 2, "2027-01-14", "2027-01-16"}, // checks in the day 0002 checks out
-	{"SEED-0005", "Seaside Inn", "202", "Erin Green", 1, "2027-01-11", "2027-01-12"},
+	{"5eed0000-0000-4000-8000-000000000001", "The Grand Hotel", "101", "Alice Smith", 1, "2027-01-11", "2027-01-13"},
+	{"5eed0000-0000-4000-8000-000000000002", "The Grand Hotel", "201", "Bob Jones", 2, "2027-01-10", "2027-01-14"},
+	{"5eed0000-0000-4000-8000-000000000003", "The Grand Hotel", "301", "Carol White", 4, "2027-01-12", "2027-01-15"},
+	{"5eed0000-0000-4000-8000-000000000004", "The Grand Hotel", "201", "Dan Brown", 2, "2027-01-14", "2027-01-16"}, // checks in the day booking 2 checks out
+	{"5eed0000-0000-4000-8000-000000000005", "Seaside Inn", "202", "Erin Green", 1, "2027-01-11", "2027-01-12"},
 }
 
 // Seed inserts the test hotels, rooms and bookings in one transaction.
@@ -80,8 +79,7 @@ func seed(ctx context.Context, tx *sqlx.Tx) error {
 	for _, h := range seedHotels {
 		var hotelID int64
 		err := tx.GetContext(ctx, &hotelID, `INSERT INTO hotels (name) VALUES ($1) RETURNING id`, h.name)
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.ConstraintName == "hotels_name_key" {
+		if constraint, ok := pgConstraintError(err, codeUniqueViolation); ok && constraint == "hotels_name_key" {
 			return ErrAlreadySeeded
 		}
 		if err != nil {

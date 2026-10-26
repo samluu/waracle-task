@@ -1,13 +1,9 @@
 package httpapi
 
 import (
-	"bytes"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"github.com/samluu/waracle-task/api"
 )
 
 func TestDocs(t *testing.T) {
@@ -16,14 +12,13 @@ func TestDocs(t *testing.T) {
 		wantContentType string
 		wantBody        string
 	}{
-		{"/openapi.yaml", "application/yaml", string(api.Spec)},
+		// A line from api/openapi.yaml, rather than api.Spec itself, so an empty embed can't pass.
+		{"/openapi.yaml", "application/yaml", "title: Hotel Booking API"},
 		{"/docs", "text/html; charset=utf-8", `url: "/openapi.yaml"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
-			rec := httptest.NewRecorder()
-			NewRouter(fakeStore{}).ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, tt.path, nil))
-
+			rec := serve(t, noStore(), http.MethodGet, tt.path, "")
 			if rec.Code != http.StatusOK {
 				t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 			}
@@ -34,11 +29,5 @@ func TestDocs(t *testing.T) {
 				t.Fatalf("body does not contain %q", tt.wantBody)
 			}
 		})
-	}
-}
-
-func TestSpecEmbedded(t *testing.T) {
-	if !bytes.HasPrefix(api.Spec, []byte("openapi:")) {
-		t.Fatal("api.Spec is not the OpenAPI document")
 	}
 }

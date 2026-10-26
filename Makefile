@@ -15,8 +15,8 @@ build:
 test:
 	go test -race ./...
 
-test-integration: migrate ## Run tests against the compose db too (needs a .env)
-	set -a && . ./.env && set +a && TEST_DATABASE_URL="$$DATABASE_URL" go test -race -count=1 ./...
+test-integration: ## Run all tests, including database ones against a separate hotel_test db (needs a .env)
+	./scripts/test-integration.sh
 
 lint:
 	$(GOLANGCI_LINT) run
@@ -24,11 +24,15 @@ lint:
 fmt:
 	$(GOLANGCI_LINT) fmt
 
-generate: ## Regenerate server code from api/openapi.yaml
+generate: ## Regenerate server code from api/openapi.yaml and test mocks from their interfaces
 	go generate ./...
 
-check-generate: generate ## Fail if generated code is out of date with the spec
-	git diff --exit-code -- '*.gen.go'
+# Compares the generated files before and after regenerating, not against git, so it also works with uncommitted spec changes.
+check-generate: ## Fail if generated code is out of date with the spec or the mocked interfaces
+	@before=$$(find . \( -name '*.gen.go' -o -name '*_mock_test.go' \) -exec shasum {} + | sort); \
+	go generate ./...; \
+	after=$$(find . \( -name '*.gen.go' -o -name '*_mock_test.go' \) -exec shasum {} + | sort); \
+	if [ "$$before" != "$$after" ]; then echo "generated code was out of date (now regenerated): run make generate and commit"; exit 1; fi
 
 migrate: ## Apply pending migrations to the compose db (`make up` also does this before starting the API)
 	docker compose run --rm --build migrate up
