@@ -25,6 +25,8 @@ type Store interface {
 	FindRooms(ctx context.Context, f store.RoomFilter) ([]store.Room, error)
 	CreateBooking(ctx context.Context, nb store.NewBooking) (store.BookingDetails, error)
 	GetBooking(ctx context.Context, reference uuid.UUID) (store.BookingDetails, error)
+	Seed(ctx context.Context) error
+	Reset(ctx context.Context) error
 }
 
 // EmailQueue takes confirmation emails to send in the background; *email.Queue implements it. Enqueue

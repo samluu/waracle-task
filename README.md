@@ -2,9 +2,11 @@
 
 ## Use of AI
 
-- generate a skeleton with AI to setup docker-compose, postgres, the default go web framework, CI/CD etc
-- set up the OpenAPI spec, code generation from it, and Swagger UI
-- review the repo and explain trade-offs in the generated code
+I used Claude Code throughout to do the following:
+
+- generate a skeleton to setup docker-compose, postgres, the default go web framework, CI/CD etc
+- generate most of the code, I then followed up on what it outputted and asked for changes where I either found it too convoluted or the feature wasn't needed
+- I asked AI about some of the code it generated so I could understand everything
 
 ## Assumptions
 
@@ -13,9 +15,9 @@
 - refunds/cancellations are out of scope
 - adding extra people to rooms that aren't full is out of scope
 - a booking is only for one hotel and for one room therefore a booking also has a maximum of 4 people. If someone wants to book additional rooms, another booking needs to be made
-- check in date is inclusive and check out date is exclusive, they'll be the same if the stay is 1 night
+- check in date is inclusive and check out date is exclusive, so a 1 night stay checks out the day after it checks in
 - a booking records the lead guest's name and the number of guests, we don't need to store all the guests
-- when searching for a room, the filters are an optional hotel name, number of guests and a date range. The search is applied to all matching hotels and rooms
+- when searching for a room, the date range and number of guests are required and the hotel name is optional. Without a hotel name the search covers every hotel
 - searching by hotel name is fuzzy and uses Postgres trigram word similarity
 - hotel names are unique
 - seeding gives some fixed data that can be reset. Not generating random data as that's more useful for load testing whilst the fixed data is better for manual tests
@@ -51,7 +53,7 @@ Test data
 make seed    # 2 hotels ("The Grand Hotel", "Seaside Inn"), 6 rooms each, 5 bookings
 make reset   # remove all hotels, rooms and bookings
 ```
-Seeding fails if the data is already there, so run `make reset` first to start again. The bookings have fixed references, UUIDs `5eed0000-0000-4000-8000-000000000001` to `...005`, and are all in January 2027; see [internal/store/seed.go](internal/store/seed.go).
+The API does the same with `POST /admin/seed` and `POST /admin/reset`, e.g. from Swagger UI. Seeding fails if the data is already there, so reset first to start again. The bookings have fixed references, UUIDs `5eed0000-0000-4000-8000-000000000001` to `...005`, and are all in January 2027; see [internal/store/seed.go](internal/store/seed.go).
 
 Run tests
 ```
@@ -67,8 +69,10 @@ make test
 | GET | `/rooms?check_in=&check_out=&guests=[&hotel_name=][&limit=][&cursor=]` | Rooms free for the whole stay that can hold the guests, in every hotel or only those whose name is a fuzzy match for `hotel_name`, as `/hotels` matches. Paged: up to `limit` rooms (default 20, max 100) per page; pass the response's `next_cursor` as `cursor` for the next page |
 | POST | `/bookings` | Book a room (`room_id` comes from `GET /rooms`) |
 | GET | `/bookings/{reference}` | Booking details |
+| POST | `/admin/seed` | Add the test data (204; 409 if it's already there). For testing: like the rest of the API, it needs no authentication |
+| POST | `/admin/reset` | Remove all hotels, rooms and bookings (204), ready for seeding |
 
-For example, after `make seed`:
+For example, after `make seed` or `POST /admin/seed`:
 ```
 curl 'localhost:8080/rooms?check_in=2027-01-11&check_out=2027-01-13&guests=1&hotel_name=grand'
 curl -X POST localhost:8080/bookings -d '{"room_id":2,"guest_name":"Jane Doe","guests":1,"check_in":"2027-01-11","check_out":"2027-01-13"}'

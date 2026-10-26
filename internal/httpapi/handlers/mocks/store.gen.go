@@ -31,6 +31,12 @@ import (
 //			PingFunc: func(ctx context.Context) error {
 //				panic("mock out the Ping method")
 //			},
+//			ResetFunc: func(ctx context.Context) error {
+//				panic("mock out the Reset method")
+//			},
+//			SeedFunc: func(ctx context.Context) error {
+//				panic("mock out the Seed method")
+//			},
 //		}
 //
 //		// use mockedStore in code that requires handlers.Store
@@ -52,6 +58,12 @@ type StoreMock struct {
 
 	// PingFunc mocks the Ping method.
 	PingFunc func(ctx context.Context) error
+
+	// ResetFunc mocks the Reset method.
+	ResetFunc func(ctx context.Context) error
+
+	// SeedFunc mocks the Seed method.
+	SeedFunc func(ctx context.Context) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -88,12 +100,24 @@ type StoreMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
+		// Reset holds details about calls to the Reset method.
+		Reset []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
+		// Seed holds details about calls to the Seed method.
+		Seed []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+		}
 	}
 	lockCreateBooking sync.RWMutex
 	lockFindHotels    sync.RWMutex
 	lockFindRooms     sync.RWMutex
 	lockGetBooking    sync.RWMutex
 	lockPing          sync.RWMutex
+	lockReset         sync.RWMutex
+	lockSeed          sync.RWMutex
 }
 
 // CreateBooking calls CreateBookingFunc.
@@ -269,5 +293,69 @@ func (mock *StoreMock) PingCalls() []struct {
 	mock.lockPing.RLock()
 	calls = mock.calls.Ping
 	mock.lockPing.RUnlock()
+	return calls
+}
+
+// Reset calls ResetFunc.
+func (mock *StoreMock) Reset(ctx context.Context) error {
+	if mock.ResetFunc == nil {
+		panic("StoreMock.ResetFunc: method is nil but Store.Reset was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockReset.Lock()
+	mock.calls.Reset = append(mock.calls.Reset, callInfo)
+	mock.lockReset.Unlock()
+	return mock.ResetFunc(ctx)
+}
+
+// ResetCalls gets all the calls that were made to Reset.
+// Check the length with:
+//
+//	len(mockedStore.ResetCalls())
+func (mock *StoreMock) ResetCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockReset.RLock()
+	calls = mock.calls.Reset
+	mock.lockReset.RUnlock()
+	return calls
+}
+
+// Seed calls SeedFunc.
+func (mock *StoreMock) Seed(ctx context.Context) error {
+	if mock.SeedFunc == nil {
+		panic("StoreMock.SeedFunc: method is nil but Store.Seed was just called")
+	}
+	callInfo := struct {
+		Ctx context.Context
+	}{
+		Ctx: ctx,
+	}
+	mock.lockSeed.Lock()
+	mock.calls.Seed = append(mock.calls.Seed, callInfo)
+	mock.lockSeed.Unlock()
+	return mock.SeedFunc(ctx)
+}
+
+// SeedCalls gets all the calls that were made to Seed.
+// Check the length with:
+//
+//	len(mockedStore.SeedCalls())
+func (mock *StoreMock) SeedCalls() []struct {
+	Ctx context.Context
+} {
+	var calls []struct {
+		Ctx context.Context
+	}
+	mock.lockSeed.RLock()
+	calls = mock.calls.Seed
+	mock.lockSeed.RUnlock()
 	return calls
 }

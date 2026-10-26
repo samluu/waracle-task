@@ -127,3 +127,20 @@ func TestHTTPHotelPage(t *testing.T) {
 	assertJSON(t, serve(t, hotels(), http.MethodGet, search, ""),
 		http.StatusOK, `{"hotels":[]}`)
 }
+
+// Pins the admin endpoints' wire format: 204 with no body, and the JSON error when already seeded.
+func TestHTTPAdmin(t *testing.T) {
+	ok := &mocks.StoreMock{
+		SeedFunc:  func(context.Context) error { return nil },
+		ResetFunc: func(context.Context) error { return nil },
+	}
+	for _, path := range []string{"/admin/seed", "/admin/reset"} {
+		rec := serve(t, ok, http.MethodPost, path, "")
+		if rec.Code != http.StatusNoContent || rec.Body.Len() != 0 {
+			t.Fatalf("POST %s: status %d, body %q; want 204 and no body", path, rec.Code, rec.Body)
+		}
+	}
+	seeded := &mocks.StoreMock{SeedFunc: func(context.Context) error { return store.ErrAlreadySeeded }}
+	assertJSON(t, serve(t, seeded, http.MethodPost, "/admin/seed", ""),
+		http.StatusConflict, `{"error":"database already seeded; reset it first"}`)
+}

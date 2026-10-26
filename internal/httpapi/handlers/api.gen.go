@@ -175,6 +175,12 @@ type CreateBookingJSONRequestBody = BookingRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ResetData Remove all hotels, rooms and bookings
+	// (POST /admin/reset)
+	ResetData(w http.ResponseWriter, r *http.Request)
+	// SeedData Seed test data
+	// (POST /admin/seed)
+	SeedData(w http.ResponseWriter, r *http.Request)
 	// CreateBooking Book a room
 	// (POST /bookings)
 	CreateBooking(w http.ResponseWriter, r *http.Request)
@@ -200,6 +206,34 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ResetData operation middleware
+func (siw *ServerInterfaceWrapper) ResetData(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResetData(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SeedData operation middleware
+func (siw *ServerInterfaceWrapper) SeedData(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SeedData(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // CreateBooking operation middleware
 func (siw *ServerInterfaceWrapper) CreateBooking(w http.ResponseWriter, r *http.Request) {
@@ -537,11 +571,57 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/rooms", wrapper.FindRooms)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/bookings", wrapper.CreateBooking)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/bookings/{reference}", wrapper.GetBooking)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/admin/seed", wrapper.SeedData)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/admin/reset", wrapper.ResetData)
 
 	return m
 }
 
 type BadRequestJSONResponse Error
+
+type ResetDataRequestObject struct {
+}
+
+type ResetDataResponseObject interface {
+	VisitResetDataResponse(w http.ResponseWriter) error
+}
+
+type ResetData204Response struct {
+}
+
+func (response ResetData204Response) VisitResetDataResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type SeedDataRequestObject struct {
+}
+
+type SeedDataResponseObject interface {
+	VisitSeedDataResponse(w http.ResponseWriter) error
+}
+
+type SeedData204Response struct {
+}
+
+func (response SeedData204Response) VisitSeedDataResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type SeedData409JSONResponse Error
+
+func (response SeedData409JSONResponse) VisitSeedDataResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type CreateBookingRequestObject struct {
 	Body *CreateBookingJSONRequestBody
@@ -804,6 +884,12 @@ func (response FindRooms400JSONResponse) VisitFindRoomsResponse(w http.ResponseW
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ResetData Remove all hotels, rooms and bookings
+	// (POST /admin/reset)
+	ResetData(ctx context.Context, request ResetDataRequestObject) (ResetDataResponseObject, error)
+	// SeedData Seed test data
+	// (POST /admin/seed)
+	SeedData(ctx context.Context, request SeedDataRequestObject) (SeedDataResponseObject, error)
 	// CreateBooking Book a room
 	// (POST /bookings)
 	CreateBooking(ctx context.Context, request CreateBookingRequestObject) (CreateBookingResponseObject, error)
@@ -858,6 +944,54 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ResetData operation middleware
+func (sh *strictHandler) ResetData(w http.ResponseWriter, r *http.Request) {
+	var request ResetDataRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ResetData(ctx, request.(ResetDataRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ResetData")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ResetDataResponseObject); ok {
+		if err := validResponse.VisitResetDataResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SeedData operation middleware
+func (sh *strictHandler) SeedData(w http.ResponseWriter, r *http.Request) {
+	var request SeedDataRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SeedData(ctx, request.(SeedDataRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SeedData")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SeedDataResponseObject); ok {
+		if err := validResponse.VisitSeedDataResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // CreateBooking operation middleware
