@@ -13,6 +13,11 @@
 - refunds/cancellations are out of scope
 - adding extra people to rooms that aren't full is out of scope
 - a booking is only for one hotel and for one room therefore a booking also has a maximum of 4 people. If someone wants to book additional rooms, another booking needs to be made
+- check in date is inclusive and check out date is exclusive, they'll be the same if the stay is 1 night
+- a booking records the lead guest's name and the number of guests, we don't need to store all the guests
+- when searching for a room, the filters are an optional hotel name, number of guests and a date range. The search is applied to all matching hotels and rooms
+- when searching for a hotel by name, it has to be an exact match
+- hotel names are unique
 
 ## Requirements
 
@@ -27,17 +32,19 @@ Start server
 cp .env.example .env
 make up
 ```
-This builds the API image and starts it alongside Postgres. The API is at http://localhost:8080:
+This builds the image, starts Postgres, applies database migrations, then starts the API at http://localhost:8080:
 ```
 curl localhost:8080/health   # {"status":"ok"}
 ```
 Stop it with `make down`.
 
+Migrations live in [migrations/](migrations) and are run with the [goose](https://github.com/pressly/goose) CLI in a container: `make migrate` applies pending ones to a running database, `make migrate-status` lists what has been applied.
+
 Run tests
 ```
 make test
 ```
-Run the linter with `make lint`.
+`make test-integration` also runs the database tests against the compose Postgres (it runs `make migrate` first). Run the linter with `make lint`.
 
 ## API
 

@@ -18,8 +18,21 @@ services:
       timeout: 3s
       retries: 15
 
+  # One-off goose job: applies pending migrations, then exits. Also run on demand with `make migrate`.
+  migrate:
+    build:
+      context: .
+      target: migrate
+    environment:
+      GOOSE_DBSTRING: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+
   api:
-    build: .
+    build:
+      context: .
+      target: api
     environment:
       PORT: ${PORT:?set in .env}
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
@@ -28,6 +41,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   pgdata:
