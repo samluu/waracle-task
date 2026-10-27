@@ -52,7 +52,7 @@ func (s *Server) CreateBooking(ctx context.Context, req CreateBookingRequestObje
 
 func (s *Server) GetBooking(ctx context.Context, req GetBookingRequestObject) (GetBookingResponseObject, error) {
 	booking, err := s.store.GetBooking(ctx, req.Reference)
-	if errors.Is(err, store.ErrNotFound) {
+	if errors.Is(err, store.ErrBookingNotFound) {
 		return GetBooking404JSONResponse{Error: "booking not found"}, nil
 	}
 	if err != nil {

@@ -59,13 +59,13 @@ func (s *Store) CreateBooking(ctx context.Context, nb NewBooking) (BookingDetail
 	return b, nil
 }
 
-// GetBooking returns the booking with this reference, or ErrNotFound.
+// GetBooking returns the booking with this reference, or ErrBookingNotFound.
 func (s *Store) GetBooking(ctx context.Context, reference uuid.UUID) (BookingDetails, error) {
 	var b BookingDetails
 	err := s.db.GetContext(ctx, &b,
 		`SELECT `+bookingDetailsColumns+` FROM bookings b`+bookingDetailsJoins+` WHERE b.reference = $1`, reference)
 	if errors.Is(err, sql.ErrNoRows) {
-		return BookingDetails{}, ErrNotFound
+		return BookingDetails{}, ErrBookingNotFound
 	}
 	if err != nil {
 		return BookingDetails{}, fmt.Errorf("get booking: %w", err)

@@ -10,7 +10,7 @@ run: ## Run the API on the host (needs a .env, the db and its schema: `docker co
 	set -a && . ./.env && set +a && go run ./cmd/api
 
 build:
-	go build -o bin/ ./cmd/...
+	go build -o bin/ ./cmd/api
 
 test:
 	go test -race ./...
@@ -40,11 +40,11 @@ migrate: ## Apply pending migrations to the compose db (`make up` also does this
 migrate-status: ## Show which migrations have been applied
 	docker compose run --rm --build migrate status
 
-seed: ## Insert the test hotels and rooms (fails if already seeded; `make reset` first)
-	docker compose run --rm --build --entrypoint /devdata api seed
+seed: ## Insert the test hotels and rooms through the running API (fails if already seeded; `make reset` first)
+	set -a && . ./.env && set +a && curl -sS --fail-with-body -X POST "localhost:$${PORT}/admin/seed" && echo seeded
 
-reset: ## Remove all hotels, rooms and bookings
-	docker compose run --rm --build --entrypoint /devdata api reset
+reset: ## Remove all hotels, rooms and bookings through the running API
+	set -a && . ./.env && set +a && curl -sS --fail-with-body -X POST "localhost:$${PORT}/admin/reset" && echo reset
 
 up:
 	docker compose up --build -d

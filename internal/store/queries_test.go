@@ -296,7 +296,7 @@ func TestGetBooking(t *testing.T) {
 		t.Errorf("got %+v", b)
 	}
 
-	if _, err := s.GetBooking(t.Context(), uuid.New()); !errors.Is(err, ErrNotFound) {
-		t.Errorf("want ErrNotFound, got %v", err)
+	if _, err := s.GetBooking(t.Context(), uuid.New()); !errors.Is(err, ErrBookingNotFound) {
+		t.Errorf("want ErrBookingNotFound, got %v", err)
 	}
 }

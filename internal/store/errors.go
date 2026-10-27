@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	ErrNotFound        = errors.New("not found")
+	ErrBookingNotFound = errors.New("booking not found")
 	ErrRoomNotFound    = errors.New("room not found")
 	ErrRoomUnavailable = errors.New("room is already booked for some of those nights")
 	ErrOverCapacity    = errors.New("more guests than the room's capacity")

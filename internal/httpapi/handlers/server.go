@@ -3,9 +3,7 @@
 // package wires it into an HTTP router.
 package handlers
 
-//go:generate go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.1 -config oapi-codegen.yaml ../../../api/openapi.yaml
-//go:generate go tool moq -pkg mocks -skip-ensure -out mocks/store.gen.go . Store
-//go:generate go tool moq -pkg mocks -skip-ensure -out mocks/email_queue.gen.go . EmailQueue
+//go:generate go tool oapi-codegen -config oapi-codegen.yaml ../../../api/openapi.yaml
 
 import (
 	"context"
@@ -19,6 +17,8 @@ import (
 )
 
 // Store is the data access the handlers depend on; *store.Store implements it.
+//
+//go:generate go tool moq -pkg mocks -skip-ensure -out mocks/store.gen.go . Store
 type Store interface {
 	Ping(ctx context.Context) error
 	FindHotels(ctx context.Context, f store.HotelFilter) ([]store.Hotel, error)
@@ -31,6 +31,8 @@ type Store interface {
 
 // EmailQueue takes confirmation emails to send in the background; *email.Queue implements it. Enqueue
 // must not block: it reports false if it can't take the email.
+//
+//go:generate go tool moq -pkg mocks -skip-ensure -out mocks/email_queue.gen.go . EmailQueue
 type EmailQueue interface {
 	Enqueue(c email.Confirmation) bool
 }

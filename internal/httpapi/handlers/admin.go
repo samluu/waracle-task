@@ -7,8 +7,8 @@ import (
 	"github.com/samluu/waracle-task/internal/store"
 )
 
-// SeedData and ResetData expose the same seeding and resetting as `make seed` and `make reset`, for
-// testing the API without the command line.
+// SeedData and ResetData add and remove the test data, for testing the API; `make seed` and `make reset`
+// call them.
 
 func (s *Server) SeedData(ctx context.Context, _ SeedDataRequestObject) (SeedDataResponseObject, error) {
 	err := s.store.Seed(ctx)

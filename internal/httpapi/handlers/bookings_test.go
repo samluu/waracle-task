@@ -87,7 +87,7 @@ func TestGetBooking(t *testing.T) {
 			GetBooking200JSONResponse(apiTestBooking), nil},
 		{"not found",
 			&mocks.StoreMock{GetBookingFunc: func(context.Context, uuid.UUID) (store.BookingDetails, error) {
-				return store.BookingDetails{}, store.ErrNotFound
+				return store.BookingDetails{}, store.ErrBookingNotFound
 			}},
 			GetBooking404JSONResponse{Error: "booking not found"}, nil},
 		{"store failure is returned",
